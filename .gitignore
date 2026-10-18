@@ -1,0 +1,10 @@
+# Persönliches und Daten nie hochladen
+CLAUDE.local.md
+*.csv
+*.zip
+*backup*.json
+Import/
+daten/
+.DS_Store
+node_modules/
+vorlagen/
