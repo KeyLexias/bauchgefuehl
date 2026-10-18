@@ -22,6 +22,8 @@ export function wertSetzen(werte, pfad, wert) {
 }
 
 const sichtbar = (liste) => (liste ?? []).filter((x) => !x.ausgeblendet);
+// Ausgeblendete Optionen erscheinen trotzdem, solange sie im Eintrag gewählt sind.
+const sichtbareOptionen = (f, gewaehlt) => (f.optionen ?? []).filter((o) => !o.ausgeblendet || gewaehlt(o.id));
 
 function optionSymbol(o, groesse = 20) {
   if (o.bild) {
@@ -52,7 +54,7 @@ function hinweisBox(text) {
 function einfachZeichnen(f, ctx, basis) {
   const pfad = [...basis, f.id];
   const gewaehlt = wertLesen(ctx.werte, pfad);
-  const optionen = sichtbar(f.optionen);
+  const optionen = sichtbareOptionen(f, (id) => id === gewaehlt);
   const darst = f.darstellung ?? 'kacheln';
   const k = (o, klasse, inhalt) => knopf({ pfad, aktion: 'waehlen', wert: o.id, an: gewaehlt === o.id, klasse, inhalt });
 
@@ -82,7 +84,7 @@ function einfachZeichnen(f, ctx, basis) {
 function mehrfachZeichnen(f, ctx, basis) {
   const pfad = [...basis, f.id];
   const auswahl = wertLesen(ctx.werte, pfad) ?? {};
-  const optionen = sichtbar(f.optionen);
+  const optionen = sichtbareOptionen(f, (id) => !!auswahl[id]);
   const darst = f.darstellung ?? (f.stufen ? 'liste' : 'pillen');
   const unterFelder = (o) => [...sichtbar(o.zusatz), ...(o.ohneJeOption ? [] : sichtbar(f.jeOption))];
   const hinweise = [];

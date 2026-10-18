@@ -126,5 +126,10 @@ export async function uebersicht(tag, speicherHinweis = '') {
       <h2>Einträge</h2>
       ${liste ? `<div class="karte eintraege">${liste}</div>` : '<p class="fussnote links">An diesem Tag noch nichts eingetragen.</p>'}
     </section>
+    <a class="karte daten-link" href="#/daten" style="--farbe: var(--schlaf)">
+      <span class="symbol-klein">${symbol('sichern', 20)}</span>
+      <span><strong>Daten</strong><span>Sichern, Wiederherstellen, CSV</span></span>
+      ${symbol('weiter', 18)}
+    </a>
     ${speicherHinweis}`;
 }

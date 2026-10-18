@@ -443,3 +443,26 @@ a.banner { text-decoration: none; }
 }
 .zeile[aria-pressed="true"] .etikett { background: rgba(255, 255, 255, 0.22); color: #FFFFFF; }
 .kachel .form { width: 24px; height: 24px; }
+
+/* ---------- Daten ---------- */
+.zurueck-link {
+  display: inline-flex; align-items: center; gap: 2px; align-self: flex-start;
+  min-height: var(--tippen); margin: -12px 0 -14px -6px; color: var(--schlaf); font-size: 17px;
+}
+.daten-karte { display: flex; flex-direction: column; gap: 12px; }
+.daten-karte .knopf { width: 100%; cursor: pointer; }
+.knopf.gesperrt { opacity: 0.45; pointer-events: none; }
+.daten-stand { margin: 0; font-size: 15px; color: var(--text-2); }
+.daten-stand strong { color: var(--text); }
+.fussnote code { font-size: 12px; }
+.bericht { font-size: 14px; }
+.bericht h3 { font-family: var(--rund); font-size: 17px; margin-bottom: 6px; }
+.bericht ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.bericht p { margin: 8px 0 0; color: var(--text-2); }
+.bericht .klein { font-size: 12px; color: var(--text-2); }
+.daten-link {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) 18px; gap: 12px; align-items: center; padding: 12px 14px;
+}
+.daten-link > span:nth-child(2) { display: flex; flex-direction: column; }
+.daten-link > span:nth-child(2) span { font-size: 13px; color: var(--text-2); }
+.daten-link > svg { color: var(--text-3); }

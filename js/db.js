@@ -96,6 +96,19 @@ export async function loeschen(speicher, id) {
   await fertig(tx);
 }
 
+/** Speichert viele Objekte in mehreren Speichern in einer Transaktion: { eintraege: [...], … } */
+export async function vieleSpeichern(inhalt) {
+  const namen = Object.keys(inhalt).filter((n) => inhalt[n]?.length);
+  if (!namen.length) return;
+  const db = await oeffnen();
+  const tx = db.transaction(namen, 'readwrite');
+  for (const name of namen) {
+    const s = tx.objectStore(name);
+    for (const objekt of inhalt[name]) s.put(objekt);
+  }
+  await fertig(tx);
+}
+
 /** Ersetzt den gesamten Inhalt in einer Transaktion: entweder alles oder nichts. */
 export async function allesErsetzen(inhalt) {
   const db = await oeffnen();

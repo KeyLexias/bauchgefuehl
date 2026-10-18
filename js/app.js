@@ -4,6 +4,7 @@ import { BEISPIEL, BEREICHE } from './konfiguration.js';
 import { formularAnzeigen } from './formular.js';
 import { esc, datumText } from './hilfen.js';
 import { uebersicht, kopf, tagAdresse } from './uebersicht.js';
+import { datenAnzeigen } from './daten.js';
 
 const TABS = [
   { pfad: 'uebersicht', titel: 'Übersicht', symbol: 'uebersicht' },
@@ -140,24 +141,12 @@ function beispielErgebnis(ziel, eintrag) {
   karte.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function datenAnsicht() {
-  return `
-    ${kopf('Daten')}
-    <section class="karte leer" style="--farbe: var(--schlaf)">
-      <span class="symbol-gross">${symbol('sichern', 28)}</span>
-      <h2>Sichern und Wiederherstellen</h2>
-      <p>Folgt im nächsten Ausbauschritt.</p>
-      <a class="knopf" href="#/uebersicht">Zur Übersicht</a>
-    </section>`;
-}
-
 const ANSICHTEN = {
   uebersicht: () => {
     const [, tag] = adresse();
     const gueltig = GUELTIGER_TAG.test(tag ?? '') && tag <= datumText() ? tag : datumText();
     return uebersicht(gueltig, speicherHinweis());
   },
-  daten: datenAnsicht,
   genesung: () => spaeter('Genesung', '--genesung', 'genesung'),
   auswertung: () => spaeter('Auswertung', '--schlaf', 'auswertung'),
 };
@@ -170,6 +159,7 @@ async function zeichnen() {
   tabsZeichnen(pfad === 'daten' ? 'uebersicht' : pfad);
   try {
     if (istEingabe) await eingabe(ansicht);
+    else if (pfad === 'daten') await datenAnzeigen(ansicht, { meldung, speicherHinweis: speicherHinweis() });
     else ansicht.innerHTML = await ANSICHTEN[pfad]();
   } catch (fehler) {
     console.error(fehler);
