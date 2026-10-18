@@ -7,6 +7,7 @@ import { zusammenfassen } from './zusammenfassung.js';
 
 const datumLang = new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'long' });
 const fmtUhr = new Intl.DateTimeFormat('de-AT', { hour: '2-digit', minute: '2-digit' });
+const fmtWochentag = new Intl.DateTimeFormat('de-AT', { weekday: 'short' });
 
 const ERINNERUNG_STANDARD = 7;
 
@@ -28,7 +29,7 @@ export function kopf(titel, tag) {
       </div>
       <div class="kopf-zeile">
         <h1>${esc(titel)}</h1>
-        ${tag ? `<a class="rund-knopf" href="#/einstellungen" aria-label="Einstellungen">${symbol('zahnrad', 22)}</a>` : ''}
+        ${tag ? `<a class="rund-knopf glas" href="#/einstellungen" aria-label="Einstellungen">${symbol('zahnrad', 22)}</a>` : ''}
       </div>
     </header>`;
 }
@@ -65,6 +66,24 @@ function leer(speicherHinweis) {
     ${speicherHinweis}`;
 }
 
+/** Leiste mit den sieben Tagen der Woche (Montag bis Sonntag), Punkt bei Tagen mit Einträgen. */
+async function wochenleiste(tag) {
+  const montag = tageVerschieben(tag, -((alsDatum(tag).getDay() + 6) % 7));
+  const sonntag = tageVerschieben(montag, 6);
+  const heute = datumText();
+  const mitEintrag = new Set((await eintraegeZwischen(`${montag}T00:00`, `${sonntag}T23:59`))
+    .map((e) => e.zeitpunkt.slice(0, 10)));
+  const tage = Array.from({ length: 7 }, (_, i) => tageVerschieben(montag, i)).map((t) => {
+    const name = fmtWochentag.format(alsDatum(t)).replace('.', '');
+    const inhalt = `${esc(name)}<b>${alsDatum(t).getDate()}</b><i${mitEintrag.has(t) ? '' : ' class="ohne"'}></i>`;
+    const klassen = ['woche-tag', t === tag ? 'gewaehlt' : '', t === heute ? 'heute' : ''].join(' ');
+    return t > heute
+      ? `<span class="${klassen} zukunft" aria-disabled="true">${inhalt}</span>`
+      : `<a class="${klassen}" href="${tagAdresse(t)}" ${t === tag ? 'aria-current="date"' : ''}>${inhalt}</a>`;
+  });
+  return `<nav class="woche" aria-label="Woche">${tage.join('')}</nav>`;
+}
+
 export async function uebersicht(tag, speicherHinweis = '') {
   const bereiche = (await alle(SPEICHER.config))
     .filter((b) => BEREICHE[b.id] && !b.ausgeblendet && b.felder?.length)
@@ -82,11 +101,18 @@ export async function uebersicht(tag, speicherHinweis = '') {
   const schnell = bereiche.filter((b) => b.zeitart !== 'tag');
   const tagesweise = bereiche.filter((b) => b.zeitart === 'tag');
 
-  const kacheln = schnell.map((b) => `
-    <a class="schnell" href="${neuAdresse(b.id, tag)}" style="--farbe: ${farbe(b)}">
-      <span class="schnell-symbol">${sym(b)}</span>
-      <span>${esc(name(b))}</span>
-    </a>`).join('');
+  const kacheln = schnell.map((b) => {
+    const n = eintraege.filter((e) => e.bereich === b.id).length;
+    const text = n === 0 ? 'Neuer Eintrag' : n === 1 ? '1 Eintrag' : `${n} Einträge`;
+    return `
+    <a class="tageskarte" href="${neuAdresse(b.id, tag)}" style="--farbe: ${farbe(b)}">
+      <span class="tageskarte-kopf">
+        <span class="symbol-voll">${sym(b)}</span>
+        <span class="marke" aria-hidden="true">${symbol('plus', 16, 2.6)}</span>
+      </span>
+      <span class="tageskarte-text"><strong>${esc(name(b))}</strong><span>${text}</span></span>
+    </a>`;
+  }).join('');
 
   const karten = tagesweise.map((b) => {
     const e = eintraege.find((x) => x.bereich === b.id);
@@ -95,8 +121,8 @@ export async function uebersicht(tag, speicherHinweis = '') {
     return `
       <a class="tageskarte" href="${ziel}" style="--farbe: ${farbe(b)}">
         <span class="tageskarte-kopf">
-          <span class="symbol-klein">${sym(b)}</span>
-          <span class="status ${e ? 'erledigt' : ''}">${e ? 'Erledigt' : 'Offen'}</span>
+          <span class="symbol-voll">${sym(b)}</span>
+          <span class="marke ${e ? 'erledigt' : ''}" role="img" aria-label="${e ? 'Erledigt' : 'Offen'}">${symbol(e ? 'haken' : 'plus', 16, 2.6)}</span>
         </span>
         <span class="tageskarte-text"><strong>${esc(name(b))}</strong><span>${esc(text)}</span></span>
       </a>`;
@@ -120,9 +146,9 @@ export async function uebersicht(tag, speicherHinweis = '') {
 
   return `
     ${kopf('Bauchgefühl', tag)}
+    ${await wochenleiste(tag)}
     ${await sicherungsBanner()}
-    ${kacheln ? `<div class="schnell-raster" style="--spalten: ${Math.min(schnell.length, 3)}">${kacheln}</div>` : ''}
-    ${karten ? `<div class="tageskarten">${karten}</div>` : ''}
+    ${kacheln || karten ? `<div class="tageskarten">${kacheln}${karten}</div>` : ''}
     <section class="abschnitt">
       <h2>Einträge</h2>
       ${liste ? `<div class="karte eintraege">${liste}</div>` : '<p class="fussnote links">An diesem Tag noch nichts eingetragen.</p>'}

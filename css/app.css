@@ -11,6 +11,14 @@
   --tabs-grund: rgba(255, 255, 255, 0.94);
   --schatten-sheet: rgba(0, 0, 0, 0.38);
 
+  /* App-Farbe, weicher Grund oben, Glas für schwebende Leisten */
+  --akzent: #1F8A5B;
+  --grund-oben: #E3F1E8;
+  --glas: rgba(255, 255, 255, 0.58);
+  --glas-kante: rgba(255, 255, 255, 0.8);
+  --glas-schatten: rgba(20, 50, 35, 0.16);
+  --karte-schatten: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 18px rgba(30, 60, 45, 0.06);
+
   /* Farbe je Bereich */
   --stuhlgang: #A16207;
   --magen: #C2410C;
@@ -47,6 +55,12 @@
     --fuellung: #2C2C2E;
     --tabs-grund: rgba(22, 22, 24, 0.94);
     --schatten-sheet: rgba(0, 0, 0, 0.6);
+    --akzent: #4ADE9B;
+    --grund-oben: #0C1A13;
+    --glas: rgba(44, 44, 48, 0.52);
+    --glas-kante: rgba(255, 255, 255, 0.14);
+    --glas-schatten: rgba(0, 0, 0, 0.5);
+    --karte-schatten: none;
 
     --stuhlgang: #D9A23B;
     --magen: #F0804A;
@@ -75,6 +89,12 @@
   --fuellung: #2C2C2E;
   --tabs-grund: rgba(22, 22, 24, 0.94);
   --schatten-sheet: rgba(0, 0, 0, 0.6);
+  --akzent: #4ADE9B;
+  --grund-oben: #0C1A13;
+  --glas: rgba(44, 44, 48, 0.52);
+  --glas-kante: rgba(255, 255, 255, 0.14);
+  --glas-schatten: rgba(0, 0, 0, 0.5);
+  --karte-schatten: none;
 
   --stuhlgang: #D9A23B;
   --magen: #F0804A;
@@ -109,6 +129,15 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* Weicher Verlauf oben, bleibt beim Scrollen stehen */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(120% 45% at 0% 0%, color-mix(in srgb, var(--akzent) 12%, transparent), transparent 70%),
+    radial-gradient(90% 35% at 100% 0%, color-mix(in srgb, var(--akzent) 8%, transparent), transparent 70%),
+    linear-gradient(var(--grund-oben), var(--grund) 45%);
+}
+
 button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3 { font-family: var(--rund); margin: 0; }
@@ -117,7 +146,7 @@ h1, h2, h3 { font-family: var(--rund); margin: 0; }
 
 /* Grundlayout */
 .ansicht {
-  padding: calc(var(--abstand-oben) + 12px) 16px calc(96px + var(--abstand-unten));
+  padding: calc(var(--abstand-oben) + 12px) 16px calc(110px + var(--abstand-unten));
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -170,22 +199,33 @@ h1, h2, h3 { font-family: var(--rund); margin: 0; }
 .knopf:disabled { opacity: 0.45; cursor: default; }
 .knopf:active:not(:disabled) { transform: scale(0.98); }
 
-/* Tab-Leiste */
+/* Tab-Leiste: schwebendes Glas wie bei iOS */
+.glas {
+  background: var(--glas);
+  -webkit-backdrop-filter: blur(22px) saturate(190%);
+  backdrop-filter: blur(22px) saturate(190%);
+  box-shadow: inset 0 1px 0 var(--glas-kante), inset 0 0 0 1px color-mix(in srgb, var(--glas-kante) 55%, transparent),
+    0 10px 30px var(--glas-schatten);
+}
 .tabs {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  position: fixed; z-index: 10;
+  left: 50%; transform: translateX(-50%); width: min(calc(100% - 32px), 440px);
+  bottom: max(calc(var(--abstand-unten) - 10px), 14px);
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 6px 12px max(var(--abstand-unten), 10px);
-  background: var(--tabs-grund);
-  border-top: 1px solid var(--rand);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+  padding: 4px; border-radius: 32px;
 }
 .tabs a {
-  min-height: 50px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  font-size: 11px; font-weight: 600; color: var(--text-3);
+  min-height: 56px; border-radius: 28px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-size: 11px; font-weight: 600; color: var(--text-2);
+  transition: background-color 0.2s, color 0.2s;
 }
-.tabs a[aria-current="page"] { color: var(--text); }
+.tabs a[aria-current="page"] { color: var(--akzent); background: color-mix(in srgb, var(--text) 8%, transparent); }
+
+/* „Transparenz reduzieren" in den iPhone-Einstellungen: festes statt durchsichtiges Glas */
+@media (prefers-reduced-transparency: reduce) {
+  .glas { background: var(--karte); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
 
 /* Hinweis-Leiste, z. B. Erinnerung an die Sicherung */
 .banner {
@@ -400,26 +440,27 @@ textarea.eingabe-feld { resize: vertical; min-height: 88px; }
   display: flex; align-items: center; justify-content: center;
   background: var(--karte); color: var(--text-2);
 }
-.zu-heute { font-size: 13px; font-weight: 600; color: var(--schlaf); padding: 6px 0; }
+.zu-heute { font-size: 13px; font-weight: 600; color: var(--akzent); padding: 6px 0; }
 a.banner { text-decoration: none; }
 .textlink { color: var(--farbe, var(--schlaf)); font-weight: 600; font-size: 15px; padding: 10px; }
 .fussnote.links { text-align: left; padding: 0; }
 
-.schnell-raster { display: grid; grid-template-columns: repeat(var(--spalten, 3), minmax(0, 1fr)); gap: 10px; }
-.schnell {
-  background: color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000); color: #FFFFFF; border-radius: var(--radius);
-  padding: 14px 12px; min-height: 92px;
-  display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
-  font-size: 15px; font-weight: 600;
+.woche { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: -4px 0 -2px; }
+.woche-tag {
+  min-height: 62px; border-radius: 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-size: 12px; font-weight: 600; color: var(--text-3);
 }
-.schnell-symbol {
-  width: 36px; height: 36px; border-radius: 11px; background: rgba(255, 255, 255, 0.22);
-  display: flex; align-items: center; justify-content: center;
-}
+.woche-tag b { font-family: var(--rund); font-size: 18px; color: var(--text); }
+.woche-tag i { width: 5px; height: 5px; border-radius: 50%; background: var(--akzent); }
+.woche-tag i.ohne { background: transparent; }
+.woche-tag.heute b { color: var(--akzent); }
+.woche-tag.gewaehlt { background: var(--karte); box-shadow: var(--karte-schatten); }
+.woche-tag.zukunft { opacity: 0.45; }
 
 .tageskarten { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .tageskarte {
-  background: var(--karte); border-radius: var(--radius); padding: 14px; min-height: 112px;
+  background: var(--karte); border-radius: 22px; padding: 14px; min-height: 108px; box-shadow: var(--karte-schatten);
   display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
 }
 .tageskarte-kopf { display: flex; justify-content: space-between; align-items: center; }
@@ -431,13 +472,19 @@ a.banner { text-decoration: none; }
   display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--farbe) 16%, transparent); color: var(--farbe);
 }
-.status {
-  font-size: 12px; font-weight: 700; border-radius: 10px; padding: 3px 8px;
-  background: var(--fuellung); color: var(--text-2);
+.symbol-voll {
+  width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000); color: #FFFFFF;
 }
-.status.erledigt { background: color-mix(in srgb, var(--uebung) 16%, transparent); color: var(--uebung); }
+.marke {
+  width: 26px; height: 26px; border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--farbe) 14%, transparent); color: var(--farbe);
+}
+.marke.erledigt { background: color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000); color: #FFFFFF; }
 
-.eintraege { padding: 4px 14px; display: flex; flex-direction: column; }
+.eintraege { padding: 4px 14px; display: flex; flex-direction: column; border-radius: 22px; box-shadow: var(--karte-schatten); }
 .eintrag-zeile {
   display: grid; grid-template-columns: 36px minmax(0, 1fr) 18px; gap: 12px; align-items: center;
   padding: 10px 0; min-height: 56px; border-bottom: 1px solid var(--linie); color: var(--text);
@@ -616,6 +663,6 @@ a.banner { text-decoration: none; }
 .symbol-wahl input:focus-visible + span { outline: 2px solid var(--farbe); outline-offset: 2px; }
 .haken-zeile { display: flex; align-items: center; gap: 10px; min-height: var(--tippen); font-size: 16px; }
 .haken-zeile input { width: 22px; height: 22px; accent-color: var(--farbe); }
-.kopf .datum-link { color: var(--schlaf); }
+.kopf .datum-link { color: var(--akzent); }
 .ansicht > .knopf { background: var(--karte); }
 [data-daten] { display: contents; }
