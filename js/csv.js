@@ -267,6 +267,7 @@ export function zeileLesen(bereich, zeile, kontext) {
   const tagesweise = bereich.zeitart === 'tag';
   const werte = {};
   let zeitpunkt;
+  let ohneUhrzeit = false;
 
   spalten.forEach((spalte, i) => {
     const text = (zellen[i] ?? '').trim();
@@ -274,6 +275,7 @@ export function zeileLesen(bereich, zeile, kontext) {
       const m = text.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/);
       if (!m) return;
       zeitpunkt = tagesweise ? `${m[1]}T00:00` : `${m[1]}T${m[2] ?? '12:00'}`;
+      ohneUhrzeit = !m[2];
       return;
     }
     if (spalte.art === 'irgendein') {
@@ -298,6 +300,12 @@ export function zeileLesen(bereich, zeile, kontext) {
 
   if (!zeitpunkt || Number.isNaN(Date.parse(zeitpunkt))) throw new Error('Datum fehlt oder ist ungültig');
 
+  // Steht nur ein Datum in der Datei, gibt die Tageszeit die Uhrzeit vor.
+  if (!tagesweise && ohneUhrzeit) {
+    const f = (bereich.felder ?? []).find((x) => x.typ === 'tageszeit' && werte[x.id] !== undefined);
+    const uhrzeit = TAGESZEITEN.find((t) => t.id === werte[f?.id])?.uhrzeit;
+    if (uhrzeit) zeitpunkt = `${zeitpunkt.slice(0, 10)}T${uhrzeit}`;
+  }
   // Tageszeit, die nicht in der CSV steht, aus der Uhrzeit ableiten.
   if (!tagesweise) {
     for (const f of bereich.felder ?? []) {

@@ -10,6 +10,11 @@
 //   reihenfolge  Position auf der Übersicht
 //   titelStil  'frage' zeigt Feldtitel als ganze Fragen statt als Abschnittstitel
 //   zusammenfassung  Feld-Ids, die auf der Übersicht als Kurztext erscheinen
+//   ohneEintragNormal  true: es wird nur eingetragen, wenn etwas ist. Ein Tag mit anderen Einträgen, aber ohne Eintrag
+//              hier, zählt in der Auswertung als Normalfall (bester Wert der Befinden-Skala, keine Auswahl).
+//   ohneEingabe  true: Daten kommen nur über den Import, keine Kachel auf der Übersicht, keine Punkte im Kalender
+//   gruppen    optional, für Freitext-Felder mit Rolle 'essen': [{ id, titel, muster }], muster ist ein
+//              regulärer Ausdruck (ohne Groß-/Kleinschreibung). Die Auswertung vergleicht Tage mit und ohne Treffer.
 //   felder     Liste von Feldern
 //
 // Feld:
@@ -38,13 +43,15 @@
 //   text:     platzhalter optional
 //   tageszeit, datumzeit: keine weiteren Angaben
 //   farbe     optional, Bereichsname, dessen Farbe das Feld bekommt, z. B. 'genesung'
+//   auswertungOhne  optional, regulärer Ausdruck: Optionen mit passendem Titel zählt die Auswertung nicht
 //   kurz      optional, kurze Bezeichnung für Zusammenfassungen
 //
 // Option:
 //   id, titel, kurztitel (für Zusammenfassungen), symbol (Name aus symbole.js) oder pfad (eigener SVG-Pfad),
 //   farbe (#RRGGBB), zeichen (große Ziffer vorne in der Liste), kurzTon ('gut' | 'mittel' | 'schlecht'),
 //   bild { d, viewBox } für eigene Formen, kurz (kleines Etikett rechts in der Liste),
-//   hinweis (Text, der erscheint, sobald die Option gewählt ist),
+//   hinweis (Text, der erscheint, sobald die Option gewählt ist; die Auswertung zählt solche Angaben als Warnzeichen),
+//   sondertag (bei Rolle 'besonderheit': Tage mit dieser Option zählen bei Zusammenhängen nicht mit),
 //   zusatz (Felder, die direkt darunter aufklappen, wenn die Option gewählt ist),
 //   ausgeblendet
 //
@@ -59,6 +66,7 @@ export const BEREICHE = {
   magen: { titel: 'Magen und Darm', symbol: 'magen', farbe: '--magen' },
   schlaf: { titel: 'Schlaf', symbol: 'schlaf', farbe: '--schlaf' },
   aktivitaeten: { titel: 'Aktivitäten', symbol: 'aktivitaet', farbe: '--aktivitaet' },
+  ernaehrung: { titel: 'Ernährung', symbol: 'ernaehrung', farbe: '--ernaehrung' },
   genesung: { titel: 'Genesung', symbol: 'genesung', farbe: '--genesung' },
   auswertung: { titel: 'Auswertung', symbol: 'auswertung', farbe: '--schlaf' },
   beispiel: { titel: 'Beispiel', symbol: 'stern', farbe: '--aktivitaet' },
@@ -66,12 +74,13 @@ export const BEREICHE = {
 
 export const FELDTYPEN = ['datumzeit', 'tageszeit', 'skala', 'einfach', 'mehrfach', 'person', 'zahl', 'dauer', 'janein', 'text'];
 
+// uhrzeit: angenommene Uhrzeit, wenn eine Datei nur die Tageszeit kennt
 export const TAGESZEITEN = [
   { id: 'jetzt', titel: 'Jetzt', symbol: 'uhr' },
-  { id: 'vormittag', titel: 'Vormittag', symbol: 'sonne-auf' },
-  { id: 'nachmittag', titel: 'Nachmittag', symbol: 'tag' },
-  { id: 'abend', titel: 'Abend', symbol: 'sonne-unter' },
-  { id: 'nacht', titel: 'Nacht', symbol: 'schlaf' },
+  { id: 'vormittag', titel: 'Vormittag', symbol: 'sonne-auf', uhrzeit: '10:00' },
+  { id: 'nachmittag', titel: 'Nachmittag', symbol: 'tag', uhrzeit: '15:00' },
+  { id: 'abend', titel: 'Abend', symbol: 'sonne-unter', uhrzeit: '20:00' },
+  { id: 'nacht', titel: 'Nacht', symbol: 'schlaf', uhrzeit: '23:00' },
 ];
 
 /** Alle Felder eines Bereichs inklusive Zusatzfragen, z. B. für Prüfungen und Export. */

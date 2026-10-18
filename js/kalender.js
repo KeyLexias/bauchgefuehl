@@ -27,7 +27,7 @@ export async function kalender(monat, ausgewaehlt) {
     alle(SPEICHER.config),
   ]);
   const reihenfolge = bereiche
-    .filter((b) => BEREICHE[b.id] && !b.ausgeblendet)
+    .filter((b) => BEREICHE[b.id] && !b.ausgeblendet && !b.ohneEingabe)
     .sort((a, b) => (a.reihenfolge ?? 99) - (b.reihenfolge ?? 99));
   const proTag = new Map();
   for (const e of eintraege) {
@@ -40,7 +40,7 @@ export async function kalender(monat, ausgewaehlt) {
   for (let i = 0; i < versatz; i += 1) zellen.push('<span class="kal-leer"></span>');
   for (let t = 1; t <= tageImMonat; t += 1) {
     const tag = `${monat}-${zwei(t)}`;
-    const vorhanden = proTag.get(tag) ?? new Set();
+    const vorhanden = new Set([...(proTag.get(tag) ?? [])].filter((id) => reihenfolge.some((b) => b.id === id)));
     const punkte = reihenfolge.filter((b) => vorhanden.has(b.id))
       .map((b) => `<span class="punkt" style="background: var(${BEREICHE[b.id].farbe})"></span>`).join('');
     const klassen = ['kal-tag', tag === heute ? 'heute' : '', tag === ausgewaehlt ? 'gewaehlt' : ''].join(' ');

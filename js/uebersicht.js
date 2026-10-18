@@ -73,7 +73,9 @@ async function wochenleiste(tag) {
   const montag = tageVerschieben(tag, -((alsDatum(tag).getDay() + 6) % 7));
   const sonntag = tageVerschieben(montag, 6);
   const heute = datumText();
+  const nurImport = new Set((await alle(SPEICHER.config)).filter((b) => b.ohneEingabe).map((b) => b.id));
   const mitEintrag = new Set((await eintraegeZwischen(`${montag}T00:00`, `${sonntag}T23:59`))
+    .filter((e) => !nurImport.has(e.bereich))
     .map((e) => e.zeitpunkt.slice(0, 10)));
   const tage = Array.from({ length: 7 }, (_, i) => tageVerschieben(montag, i)).map((t) => {
     const name = fmtWochentag.format(alsDatum(t)).replace('.', '');
@@ -88,7 +90,7 @@ async function wochenleiste(tag) {
 
 export async function uebersicht(tag, speicherHinweis = '') {
   const bereiche = (await alle(SPEICHER.config))
-    .filter((b) => BEREICHE[b.id] && !b.ausgeblendet && b.felder?.length)
+    .filter((b) => BEREICHE[b.id] && !b.ausgeblendet && !b.ohneEingabe && b.felder?.length)
     .sort((a, b) => (a.reihenfolge ?? 99) - (b.reihenfolge ?? 99));
   if (!bereiche.length) return leer(speicherHinweis);
 

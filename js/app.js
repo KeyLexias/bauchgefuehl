@@ -4,7 +4,7 @@ import { alle, holen, speichern, loeschen, eintraegeZwischen, SPEICHER, dauerhaf
 import { BEISPIEL, BEREICHE } from './konfiguration.js';
 import { formularAnzeigen } from './formular.js';
 import { esc, datumText, idsZaehlen } from './hilfen.js';
-import { uebersicht, kopf, tagAdresse } from './uebersicht.js';
+import { uebersicht, tagAdresse } from './uebersicht.js';
 import { einstellungenAnzeigen } from './einstellungen.js';
 import { personenListe, personBearbeiten } from './personen.js';
 import { listenUebersicht, listeBearbeiten } from './listen.js';
@@ -12,6 +12,7 @@ import { kalender } from './kalender.js';
 import { anwenden as darstellungAnwenden } from './darstellung.js';
 import { genesungAnzeigen, istFormular, schnellEintrag } from './genesung.js';
 import { genesungLaden, mitSchmerzfragen } from './genesung-daten.js';
+import { auswertungAnzeigen } from './auswertung.js';
 
 const TABS = [
   { pfad: 'uebersicht', titel: 'Übersicht', symbol: 'uebersicht' },
@@ -99,16 +100,6 @@ function speicherHinweis() {
     ? 'Daten liegen nur auf diesem Gerät und sind vor automatischem Löschen geschützt.'
     : 'Daten liegen nur auf diesem Gerät. Der Browser hat dauerhaften Speicher nicht bestätigt, regelmäßig sichern.';
   return `<p class="fussnote">${text}</p>`;
-}
-
-function spaeter(titel, farbe, sym) {
-  return `
-    ${kopf(titel)}
-    <section class="karte leer" style="--farbe: var(${farbe})">
-      <span class="symbol-gross">${symbol(sym, 28)}</span>
-      <h2>${titel}</h2>
-      <p>Kommt in einer späteren Version.</p>
-    </section>`;
 }
 
 /** Eingabe für einen Bereich, neu oder zum Bearbeiten (#/eintrag/bereich/id). */
@@ -217,7 +208,6 @@ const ANSICHTEN = {
     const [, monat, tag] = adresse();
     return kalender(GUELTIGER_MONAT.test(monat ?? '') ? monat : datumText().slice(0, 7), GUELTIGER_TAG.test(tag ?? '') ? tag : undefined);
   },
-  auswertung: () => spaeter('Auswertung', '--schlaf', 'auswertung'),
 };
 
 /** Seiten mit eigener Bedienung: #/einstellungen, …/personen[/id], …/listen[/bereich/feld] */
@@ -243,6 +233,7 @@ async function zeichnen() {
     if (pfad === 'eintrag') await eingabe(ansicht);
     else if (pfad === 'genesung') await genesungAnzeigen(ansicht, adresse().slice(1), umgebung);
     else if (pfad === 'einstellungen') await einstellungen(ansicht);
+    else if (pfad === 'auswertung') await auswertungAnzeigen(ansicht, adresse().slice(1));
     else ansicht.innerHTML = await ANSICHTEN[pfad]();
   } catch (fehler) {
     console.error(fehler);

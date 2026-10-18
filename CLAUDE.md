@@ -30,7 +30,7 @@ Startkonfiguration. Nichts davon in Code, Commits, Kommentare, Testdaten oder Co
 
 Der Code kennt nur Bereiche und allgemeine Bausteine, keine Inhalte.
 
-- **Bereiche (fest im Code):** Schlaf, Stuhlgang, Aktivitäten, Magen und Darm, Genesung, Auswertung.
+- **Bereiche (fest im Code):** Schlaf, Stuhlgang, Aktivitäten, Magen und Darm, Ernährung (nur Import), Genesung, Auswertung.
 - **Feldtypen (fest im Code):** Datum und Uhrzeit, Tageszeit, Skala mit frei wählbarem Bereich und
   Beschriftung der Enden, Einfachauswahl, Mehrfachauswahl, Kontakt oder Person, Zahl mit Einheit,
   Dauer, Ja/Nein, Freitext. Jede Option kann ein Symbol und eine Farbe haben.
