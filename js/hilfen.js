@@ -77,3 +77,16 @@ export function farbeVon(text) {
   for (const z of String(text)) h = (h * 31 + z.codePointAt(0)) >>> 0;
   return farben[h % farben.length];
 }
+
+/** Wie oft jede Id (Person, Option) in den Werten der Einträge vorkommt. */
+export function idsZaehlen(eintraege) {
+  const zaehler = new Map();
+  const zaehlen = (wert) => {
+    if (Array.isArray(wert)) wert.forEach(zaehlen);
+    else if (wert && typeof wert === 'object') {
+      for (const [k, v] of Object.entries(wert)) { zaehler.set(k, (zaehler.get(k) ?? 0) + 1); zaehlen(v); }
+    } else if (typeof wert === 'string') zaehler.set(wert, (zaehler.get(wert) ?? 0) + 1);
+  };
+  for (const e of eintraege) zaehlen(e.werte);
+  return zaehler;
+}

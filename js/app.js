@@ -2,9 +2,13 @@ import { symbol } from './symbole.js';
 import { alle, holen, speichern, loeschen, eintraegeZwischen, SPEICHER, dauerhaftAnfragen, neueId } from './db.js';
 import { BEISPIEL, BEREICHE } from './konfiguration.js';
 import { formularAnzeigen } from './formular.js';
-import { esc, datumText } from './hilfen.js';
+import { esc, datumText, idsZaehlen } from './hilfen.js';
 import { uebersicht, kopf, tagAdresse } from './uebersicht.js';
-import { datenAnzeigen } from './daten.js';
+import { einstellungenAnzeigen } from './einstellungen.js';
+import { personenListe, personBearbeiten } from './personen.js';
+import { listenUebersicht, listeBearbeiten } from './listen.js';
+import { kalender } from './kalender.js';
+import { anwenden as darstellungAnwenden } from './darstellung.js';
 
 const TABS = [
   { pfad: 'uebersicht', titel: 'Übersicht', symbol: 'uebersicht' },
@@ -22,9 +26,13 @@ function adresse() {
   return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
 }
 
+// Seiten ohne eigenen Tab; sie gehören zur Übersicht.
+const UNTERSEITEN = ['eintrag', 'einstellungen', 'kalender'];
+
 function aktuellerPfad() {
   const [pfad] = adresse();
-  return TABS.some((t) => t.pfad === pfad) || pfad === 'eintrag' || pfad === 'daten' ? pfad : 'uebersicht';
+  if (pfad === 'daten') return 'einstellungen'; // alte Adresse
+  return TABS.some((t) => t.pfad === pfad) || UNTERSEITEN.includes(pfad) ? pfad : 'uebersicht';
 }
 
 /** Kurze Meldung unten am Bildschirm. */
@@ -94,7 +102,7 @@ async function eingabe(ziel) {
     bereich,
     eintrag,
     vorgabeTag,
-    nutzung: nutzungZaehlen(await alle(SPEICHER.eintraege)),
+    nutzung: idsZaehlen(await alle(SPEICHER.eintraege)),
     // Im Suchfeld neu angelegte Einträge werden Teil der Konfiguration und damit der Sicherung.
     optionAnlegen: async (feld, titel) => {
       const basis = `eigen_${titel.toLocaleLowerCase('de').replace(/[^a-z0-9äöüß]+/g, '_').replace(/^_|_$/g, '') || 'eintrag'}`;
@@ -137,19 +145,6 @@ async function eingabe(ziel) {
   });
 }
 
-/** Wie oft jede Id (Person, Option) in Einträgen vorkommt, für die Reihenfolge der Suchtreffer. */
-function nutzungZaehlen(eintraege) {
-  const zaehler = new Map();
-  const zaehlen = (wert) => {
-    if (Array.isArray(wert)) wert.forEach(zaehlen);
-    else if (wert && typeof wert === 'object') {
-      for (const [k, v] of Object.entries(wert)) { zaehler.set(k, (zaehler.get(k) ?? 0) + 1); zaehlen(v); }
-    } else if (typeof wert === 'string') zaehler.set(wert, (zaehler.get(wert) ?? 0) + 1);
-  };
-  for (const e of eintraege) zaehlen(e.werte);
-  return zaehler;
-}
-
 async function eintragAmTag(bereichId, tag) {
   const liste = await eintraegeZwischen(`${tag}T00:00`, `${tag}T23:59`);
   return liste.find((e) => e.bereich === bereichId);
@@ -165,25 +160,43 @@ function beispielErgebnis(ziel, eintrag) {
   karte.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+const GUELTIGER_MONAT = /^\d{4}-\d{2}$/;
+
+/** Seiten, die nur HTML liefern. */
 const ANSICHTEN = {
   uebersicht: () => {
     const [, tag] = adresse();
     const gueltig = GUELTIGER_TAG.test(tag ?? '') && tag <= datumText() ? tag : datumText();
     return uebersicht(gueltig, speicherHinweis());
   },
+  // #/kalender/JJJJ-MM/JJJJ-MM-TT: Monat und der Tag, von dem man kam
+  kalender: () => {
+    const [, monat, tag] = adresse();
+    return kalender(GUELTIGER_MONAT.test(monat ?? '') ? monat : datumText().slice(0, 7), GUELTIGER_TAG.test(tag ?? '') ? tag : undefined);
+  },
   genesung: () => spaeter('Genesung', '--genesung', 'genesung'),
   auswertung: () => spaeter('Auswertung', '--schlaf', 'auswertung'),
 };
+
+/** Seiten mit eigener Bedienung: #/einstellungen, …/personen[/id], …/listen[/bereich/feld] */
+async function einstellungen(ziel) {
+  const [, teil, a, b] = adresse();
+  if (teil === 'personen' && a) return personBearbeiten(ziel, decodeURIComponent(a), { meldung });
+  if (teil === 'personen') return personenListe(ziel);
+  if (teil === 'listen' && a && b) return listeBearbeiten(ziel, a, b, { meldung });
+  if (teil === 'listen') return listenUebersicht(ziel);
+  return einstellungenAnzeigen(ziel, { meldung, dauerhaft });
+}
 
 async function zeichnen() {
   const pfad = aktuellerPfad();
   const istEingabe = pfad === 'eintrag';
   if (updateWartet && !istEingabe) { location.reload(); return; }
   document.body.classList.toggle('ohne-tabs', istEingabe);
-  tabsZeichnen(pfad === 'daten' ? 'uebersicht' : pfad);
+  tabsZeichnen(UNTERSEITEN.includes(pfad) ? 'uebersicht' : pfad);
   try {
     if (istEingabe) await eingabe(ansicht);
-    else if (pfad === 'daten') await datenAnzeigen(ansicht, { meldung, speicherHinweis: speicherHinweis() });
+    else if (pfad === 'einstellungen') await einstellungen(ansicht);
     else ansicht.innerHTML = await ANSICHTEN[pfad]();
   } catch (fehler) {
     console.error(fehler);
@@ -217,6 +230,9 @@ function serviceWorkerStarten() {
 }
 
 window.addEventListener('hashchange', zeichnen);
+// Wechselt das iPhone zwischen hell und dunkel, passt sich die Statusleiste an.
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => darstellungAnwenden());
+darstellungAnwenden();
 
 serviceWorkerStarten();
 zeichnen();

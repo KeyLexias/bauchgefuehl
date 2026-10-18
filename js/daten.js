@@ -37,15 +37,14 @@ function berichtHtml(b) {
 }
 
 /** Zeichnet die Daten-Seite in `ziel` und hängt die Bedienung an. */
-export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '' }) {
+export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '', eingebettet = false }) {
   const [eintraege, personen, bereiche, letzte] = await Promise.all([
     anzahl(SPEICHER.eintraege), anzahl(SPEICHER.personen), alle(SPEICHER.config), metaHolen('letzteSicherung'),
   ]);
   const eingerichtet = bereiche.length > 0;
 
   ziel.innerHTML = `
-    <a class="zurueck-link" href="#/uebersicht">${symbol('zurueck', 20)}Übersicht</a>
-    ${kopf('Daten')}
+    ${eingebettet ? '' : `<a class="zurueck-link" href="#/uebersicht">${symbol('zurueck', 20)}Übersicht</a>${kopf('Daten')}`}
 
     <section class="abschnitt">
       <h2>Sicherung</h2>
@@ -90,7 +89,7 @@ export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '' }) {
   const sicherung = eingerichtet ? await sicherungErstellen() : null;
   const csvDateien = eintraege ? await csvDateienErstellen() : [];
 
-  const neuLaden = () => datenAnzeigen(ziel, { meldung, speicherHinweis });
+  const neuLaden = () => datenAnzeigen(ziel, { meldung, speicherHinweis, eingebettet });
   const bericht = ziel.querySelector('[data-bericht]');
 
   ziel.querySelector('[data-aktion="sichern"]')?.addEventListener('click', async (e) => {

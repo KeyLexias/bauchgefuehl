@@ -1,4 +1,4 @@
-/* Farben und Maße. Dunkle Werte unten unter prefers-color-scheme. */
+/* Farben und Maße. Dunkle Werte gelten automatisch (Gerät) oder fest gewählt (data-darstellung). */
 :root {
   --grund: #F2F2F7;
   --karte: #FFFFFF;
@@ -20,6 +20,13 @@
   --genesung: #BE185D;
   --ernaehrung: #4D7C0F;
 
+  /* Anteil der Bereichsfarbe für gefüllte Flächen mit weißer Schrift und für zarte Hintergründe */
+  --voll-anteil: 100%;
+  --zart-anteil: 12%;
+  --ton-gut: #15803D;
+  --ton-mittel: #92400E;
+  --ton-schlecht: #B91C1C;
+
   --rund: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
   --radius: 18px;
   --tippen: 44px;
@@ -29,7 +36,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-darstellung="hell"]) {
     --grund: #000000;
     --karte: #1C1C1E;
     --text: #F2F2F7;
@@ -48,8 +55,43 @@
     --uebung: #4ADE80;
     --genesung: #F472B6;
     --ernaehrung: #A3D45A;
+    --voll-anteil: 62%;
+    --zart-anteil: 16%;
+    --ton-gut: #4ADE80;
+    --ton-mittel: #FBBF24;
+    --ton-schlecht: #F87171;
+    color-scheme: dark;
   }
 }
+
+:root[data-darstellung="dunkel"] {
+  --grund: #000000;
+  --karte: #1C1C1E;
+  --text: #F2F2F7;
+  --text-2: #A1A1A6;
+  --text-3: #8E8E93;
+  --linie: #2C2C2E;
+  --rand: #38383A;
+  --fuellung: #2C2C2E;
+  --tabs-grund: rgba(22, 22, 24, 0.94);
+  --schatten-sheet: rgba(0, 0, 0, 0.6);
+
+  --stuhlgang: #D9A23B;
+  --magen: #F0804A;
+  --schlaf: #8B8DF5;
+  --aktivitaet: #2DD4BF;
+  --uebung: #4ADE80;
+  --genesung: #F472B6;
+  --ernaehrung: #A3D45A;
+  --voll-anteil: 62%;
+  --zart-anteil: 16%;
+  --ton-gut: #4ADE80;
+  --ton-mittel: #FBBF24;
+  --ton-schlecht: #F87171;
+  color-scheme: dark;
+}
+
+:root[data-darstellung="hell"] { color-scheme: light; }
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -123,11 +165,8 @@ h1, h2, h3 { font-family: var(--rund); margin: 0; }
   font-size: 17px; font-weight: 600;
   background: var(--fuellung); color: var(--text);
 }
-.knopf.haupt { background: var(--farbe, var(--schlaf)); color: #FFFFFF; }
-@media (prefers-color-scheme: dark) {
-  /* Bereichsfarben sind im Dunkeln hell, für weiße Schrift abdunkeln. */
-  .knopf.haupt { background: color-mix(in srgb, var(--farbe, var(--schlaf)) 62%, #000000); }
-}
+/* Bereichsfarben sind im Dunkeln hell, für weiße Schrift werden sie dort abgedunkelt. */
+.knopf.haupt { background: color-mix(in srgb, var(--farbe, var(--schlaf)) var(--voll-anteil), #000000); color: #FFFFFF; }
 .knopf:disabled { opacity: 0.45; cursor: default; }
 .knopf:active:not(:disabled) { transform: scale(0.98); }
 
@@ -167,12 +206,9 @@ body.ohne-tabs .tabs { display: none; }
 body.ohne-tabs .ansicht { padding-bottom: calc(24px + var(--abstand-unten)); }
 
 .eingabe {
-  --voll: var(--farbe);
-  --zart: color-mix(in srgb, var(--farbe) 12%, var(--karte));
+  --voll: color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000);
+  --zart: color-mix(in srgb, var(--farbe) var(--zart-anteil), var(--karte));
   display: flex; flex-direction: column; gap: 18px;
-}
-@media (prefers-color-scheme: dark) {
-  .eingabe { --voll: color-mix(in srgb, var(--farbe) 62%, #000000); --zart: color-mix(in srgb, var(--farbe) 16%, var(--karte)); }
 }
 
 .eingabe-leiste {
@@ -222,7 +258,10 @@ body.ohne-tabs .ansicht { padding-bottom: calc(24px + var(--abstand-unten)); }
   transition: background-color 0.12s, color 0.12s;
   touch-action: manipulation;
 }
-.wahl[aria-pressed="true"] { background: var(--voll); color: #FFFFFF; }
+.wahl[aria-pressed="true"] {
+  background: var(--voll, color-mix(in srgb, var(--farbe, var(--schlaf)) var(--voll-anteil), #000000)); color: #FFFFFF;
+}
+.daten-karte .wahl:not([aria-pressed="true"]) { background: var(--fuellung); }
 .wahl:active { transform: scale(0.97); }
 
 .raster { display: grid; grid-template-columns: repeat(var(--spalten, 3), minmax(0, 1fr)); gap: 8px; }
@@ -368,13 +407,10 @@ a.banner { text-decoration: none; }
 
 .schnell-raster { display: grid; grid-template-columns: repeat(var(--spalten, 3), minmax(0, 1fr)); gap: 10px; }
 .schnell {
-  background: var(--farbe); color: #FFFFFF; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000); color: #FFFFFF; border-radius: var(--radius);
   padding: 14px 12px; min-height: 92px;
   display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
   font-size: 15px; font-weight: 600;
-}
-@media (prefers-color-scheme: dark) {
-  .schnell { background: color-mix(in srgb, var(--farbe) 62%, #000000); }
 }
 .schnell-symbol {
   width: 36px; height: 36px; border-radius: 11px; background: rgba(255, 255, 255, 0.22);
@@ -415,14 +451,8 @@ a.banner { text-decoration: none; }
 
 /* ---------- Ergänzungen Eingabe ---------- */
 .eingabe .eigene-farbe {
-  --voll: var(--farbe);
-  --zart: color-mix(in srgb, var(--farbe) 12%, var(--karte));
-}
-@media (prefers-color-scheme: dark) {
-  .eingabe .eigene-farbe {
-    --voll: color-mix(in srgb, var(--farbe) 62%, #000000);
-    --zart: color-mix(in srgb, var(--farbe) 16%, var(--karte));
-  }
+  --voll: color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000);
+  --zart: color-mix(in srgb, var(--farbe) var(--zart-anteil), var(--karte));
 }
 .eingabe.fragen .feld:not(.verschachtelt) > .feld-titel {
   text-transform: none; letter-spacing: 0; font-size: 16px; font-weight: 600; color: var(--text);
@@ -433,14 +463,9 @@ a.banner { text-decoration: none; }
 }
 .zeile.mit-zeichen { grid-template-columns: 26px 52px minmax(0, 1fr) auto; }
 .zeichen { font-family: var(--rund); font-size: 20px; font-weight: 700; text-align: center; }
-.etikett.ton-gut { background: color-mix(in srgb, #16A34A 16%, transparent); color: #15803D; }
-.etikett.ton-mittel { background: color-mix(in srgb, #D97706 18%, transparent); color: #92400E; }
-.etikett.ton-schlecht { background: color-mix(in srgb, #DC2626 14%, transparent); color: #B91C1C; }
-@media (prefers-color-scheme: dark) {
-  .etikett.ton-gut { color: #4ADE80; }
-  .etikett.ton-mittel { color: #FBBF24; }
-  .etikett.ton-schlecht { color: #F87171; }
-}
+.etikett.ton-gut { background: color-mix(in srgb, #16A34A 16%, transparent); color: var(--ton-gut); }
+.etikett.ton-mittel { background: color-mix(in srgb, #D97706 18%, transparent); color: var(--ton-mittel); }
+.etikett.ton-schlecht { background: color-mix(in srgb, #DC2626 14%, transparent); color: var(--ton-schlecht); }
 .zeile[aria-pressed="true"] .etikett { background: rgba(255, 255, 255, 0.22); color: #FFFFFF; }
 .kachel .form { width: 24px; height: 24px; }
 
@@ -497,3 +522,100 @@ a.banner { text-decoration: none; }
 .pille.gewaehlt { padding: 0 10px 0 4px; gap: 6px; }
 .pille.gewaehlt > svg:last-child { opacity: 0.8; margin-left: 2px; }
 .pille.gewaehlt:not(:has(.avatar)) { padding-left: 12px; }
+
+/* ---------- Kopf, Kalender ---------- */
+.inhalt { display: contents; }
+.datum-link {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; margin: -6px 0;
+  color: var(--schlaf);
+}
+.rund-knopf.aus { visibility: hidden; }
+.rund-knopf.klein { width: 40px; height: 40px; flex-shrink: 0; background: var(--fuellung); }
+
+.kal-kopf { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kal-kopf h1 { font-size: 30px; font-weight: 700; }
+.kalender { padding: 10px 8px 12px; }
+.kal-raster { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.kal-wochentage span { text-align: center; font-size: 12px; font-weight: 600; color: var(--text-3); padding: 4px 0 6px; }
+.kal-tag {
+  min-height: 48px; border-radius: 12px; padding: 4px 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px;
+  color: var(--text);
+}
+.kal-tag:active { background: var(--fuellung); }
+.kal-zahl {
+  width: 30px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-variant-numeric: tabular-nums;
+}
+.kal-tag.heute .kal-zahl { color: var(--magen); font-weight: 700; }
+.kal-tag.gewaehlt .kal-zahl { background: var(--text); color: var(--grund); font-weight: 700; }
+.kal-tag.zukunft { color: var(--text-3); opacity: 0.5; }
+.punkte { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; max-width: 34px; }
+.punkt { width: 6px; height: 6px; border-radius: 3px; display: inline-block; }
+.legende { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--text-2); padding: 0 4px; }
+.legende > span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---------- Einstellungen ---------- */
+.segment .stufe { min-height: 40px; }
+.liste-links { padding: 2px 14px; display: flex; flex-direction: column; }
+.liste-links a {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) 18px; gap: 12px; align-items: center;
+  min-height: 56px; padding: 8px 0; border-bottom: 1px solid var(--linie); color: var(--text);
+}
+.liste-links a:last-child { border-bottom: 0; }
+.liste-links a > span:not(.symbol-klein) { display: flex; flex-direction: column; min-width: 0; }
+.liste-links a > span:not(.symbol-klein) span { font-size: 13px; color: var(--text-2); }
+.liste-links a > svg { color: var(--text-3); }
+.liste-links a:not(:has(.symbol-klein)) { grid-template-columns: minmax(0, 1fr) 18px; }
+.info { display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+.info div { display: flex; justify-content: space-between; gap: 12px; }
+.info div span:first-child { color: var(--text-2); }
+.info div span:last-child { text-align: right; }
+.eingabe-feld.rand, .suche-eingabe.rand { background: var(--fuellung); }
+.knopf.breit { width: 100%; }
+.knopf.gefahr.breit { background: var(--karte); }
+
+/* Personen */
+.personen-liste { padding: 2px 14px; display: flex; flex-direction: column; }
+.person-zeile {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) 18px; gap: 12px; align-items: center;
+  min-height: 56px; padding: 6px 0; border-bottom: 1px solid var(--linie); color: var(--text);
+}
+.person-zeile:last-child { border-bottom: 0; }
+.person-zeile > span:nth-child(2) { display: flex; flex-direction: column; min-width: 0; }
+.person-zeile > span:nth-child(2) span { font-size: 13px; color: var(--text-2); }
+.person-zeile > svg { color: var(--text-3); }
+.person-kopf { display: flex; align-items: center; gap: 14px; }
+.person-kopf .avatar { width: 56px; height: 56px; border-radius: 28px; font-size: 20px; }
+.person-kopf h1 { font-size: 26px; font-weight: 700; }
+.person-kopf p { margin: 2px 0 0; color: var(--text-2); font-size: 14px; }
+.treffer-zahl { margin-left: auto; font-size: 13px; color: var(--text-2); }
+
+/* Listen */
+.optionen-liste { padding: 2px 10px 2px 14px; display: flex; flex-direction: column; }
+.option-zeile {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) 40px 40px; gap: 8px; align-items: center;
+  min-height: 56px; padding: 6px 0; border-bottom: 1px solid var(--linie);
+}
+.option-zeile:last-child { border-bottom: 0; }
+.option-zeile.aus .option-text strong { color: var(--text-2); }
+.option-zeile.bearbeiten { grid-template-columns: minmax(0, 1fr) auto; }
+.option-zeile.bearbeiten .stufe { padding: 0 14px; min-height: 44px; }
+.option-symbol { color: var(--farbe); display: flex; align-items: center; justify-content: center; }
+.option-text { display: flex; flex-direction: column; min-width: 0; }
+.option-text strong { overflow-wrap: anywhere; }
+.option-text span { font-size: 13px; color: var(--text-2); }
+.symbol-wahl { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.symbol-wahl label { position: relative; }
+.symbol-wahl input { position: absolute; opacity: 0; inset: 0; }
+.symbol-wahl span {
+  display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 12px;
+  background: var(--fuellung); color: var(--farbe);
+}
+.symbol-wahl input:checked + span { background: var(--voll, color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000)); color: #FFFFFF; }
+.symbol-wahl input:focus-visible + span { outline: 2px solid var(--farbe); outline-offset: 2px; }
+.haken-zeile { display: flex; align-items: center; gap: 10px; min-height: var(--tippen); font-size: 16px; }
+.haken-zeile input { width: 22px; height: 22px; accent-color: var(--farbe); }
+.kopf .datum-link { color: var(--schlaf); }
+.ansicht > .knopf { background: var(--karte); }
+[data-daten] { display: contents; }

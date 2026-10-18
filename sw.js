@@ -1,6 +1,6 @@
 // Service Worker: hält alle App-Dateien offline bereit.
 // Bei jeder Änderung an einer App-Datei VERSION erhöhen, sonst bleibt am iPhone die alte Version.
-const VERSION = 'v15';
+const VERSION = 'v18';
 const CACHE = `bauchgefuehl-${VERSION}`;
 
 const DATEIEN = [
@@ -20,6 +20,11 @@ const DATEIEN = [
   'js/csv.js',
   'js/sicherung.js',
   'js/daten.js',
+  'js/darstellung.js',
+  'js/kalender.js',
+  'js/einstellungen.js',
+  'js/personen.js',
+  'js/listen.js',
   'icons/icon.svg',
   'icons/apple-touch-icon.png',
   'icons/icon-192.png',

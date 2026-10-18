@@ -80,7 +80,8 @@ export async function dateiPruefen(datei) {
 
 /**
  * Neue Konfiguration übernehmen, ohne Optionen zu verlieren, die nur in der bisherigen stehen
- * (aus dem CSV-Import oder im Suchfeld angelegt). Bereiche, die in der neuen fehlen, bleiben.
+ * (aus dem CSV-Import oder in der App angelegt) oder in der App bearbeitet wurden.
+ * Bereiche, die in der neuen fehlen, bleiben.
  */
 export function konfigurationZusammenfuehren(alt, neu) {
   const ergebnis = neu.map((b) => {
@@ -90,9 +91,11 @@ export function konfigurationZusammenfuehren(alt, neu) {
     for (const f of alleFelder(kopie.felder)) {
       const altFeld = feldFinden(vorher.felder, f.id);
       if (!altFeld?.optionen?.length) continue;
-      const ids = new Set((f.optionen ?? []).map((o) => o.id));
+      // In der App bearbeitete Optionen (umbenannt, ausgeblendet) behalten ihren Stand.
+      f.optionen = (f.optionen ?? []).map((o) => altFeld.optionen.find((x) => x.id === o.id && x.bearbeitet) ?? o);
+      const ids = new Set(f.optionen.map((o) => o.id));
       const fehlend = altFeld.optionen.filter((o) => !ids.has(o.id));
-      if (fehlend.length) f.optionen = [...(f.optionen ?? []), ...fehlend];
+      if (fehlend.length) f.optionen = [...f.optionen, ...fehlend];
     }
     return kopie;
   });
