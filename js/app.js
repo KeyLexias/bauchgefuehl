@@ -1,8 +1,9 @@
 import { symbol } from './symbole.js';
-import { alle, holen, speichern, loeschen, SPEICHER, dauerhaftAnfragen, neueId } from './db.js';
+import { alle, holen, speichern, loeschen, eintraegeZwischen, SPEICHER, dauerhaftAnfragen, neueId } from './db.js';
 import { BEISPIEL, BEREICHE } from './konfiguration.js';
 import { formularAnzeigen } from './formular.js';
-import { esc } from './hilfen.js';
+import { esc, datumText } from './hilfen.js';
+import { uebersicht, kopf, tagAdresse } from './uebersicht.js';
 
 const TABS = [
   { pfad: 'uebersicht', titel: 'Übersicht', symbol: 'uebersicht' },
@@ -13,8 +14,6 @@ const TABS = [
 const ansicht = document.getElementById('ansicht');
 const tabs = document.getElementById('tabs');
 
-const datumLang = new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'long' });
-
 let dauerhaft = null;
 let updateWartet = false;
 
@@ -24,7 +23,7 @@ function adresse() {
 
 function aktuellerPfad() {
   const [pfad] = adresse();
-  return TABS.some((t) => t.pfad === pfad) || pfad === 'eintrag' ? pfad : 'uebersicht';
+  return TABS.some((t) => t.pfad === pfad) || pfad === 'eintrag' || pfad === 'daten' ? pfad : 'uebersicht';
 }
 
 /** Kurze Meldung unten am Bildschirm. */
@@ -44,38 +43,12 @@ function tabsZeichnen(aktiv) {
     </a>`).join('');
 }
 
-function kopf(titel) {
-  return `
-    <header class="kopf">
-      <div class="datum">${datumLang.format(new Date())}</div>
-      <h1>${titel}</h1>
-    </header>`;
-}
-
 function speicherHinweis() {
   if (dauerhaft === null) return '';
   const text = dauerhaft
     ? 'Daten liegen nur auf diesem Gerät und sind vor automatischem Löschen geschützt.'
     : 'Daten liegen nur auf diesem Gerät. Der Browser hat dauerhaften Speicher nicht bestätigt, regelmäßig sichern.';
   return `<p class="fussnote">${text}</p>`;
-}
-
-async function uebersicht() {
-  const config = await alle(SPEICHER.config);
-  if (config.length === 0) {
-    return `
-      ${kopf('Bauchgefühl')}
-      <section class="karte leer" style="--farbe: var(--schlaf)">
-        <span class="symbol-gross">${symbol('wiederherstellen', 28)}</span>
-        <h2>Noch nichts eingerichtet</h2>
-        <p>Spiel deine Startdatei oder eine Sicherung ein, dann erscheinen hier deine Bereiche.</p>
-        <button class="knopf haupt" type="button" disabled>Wiederherstellen</button>
-        <p class="fussnote">Wiederherstellen folgt im nächsten Ausbauschritt.</p>
-        <a class="knopf" href="#/eintrag/beispiel">Beispiel-Eingabe ansehen</a>
-      </section>
-      ${speicherHinweis()}`;
-  }
-  return `${kopf('Bauchgefühl')}${speicherHinweis()}`;
 }
 
 function spaeter(titel, farbe, sym) {
@@ -89,19 +62,37 @@ function spaeter(titel, farbe, sym) {
 }
 
 /** Eingabe für einen Bereich, neu oder zum Bearbeiten (#/eintrag/bereich/id). */
+const GUELTIGER_TAG = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Adressen: #/eintrag/bereich (neu, heute), #/eintrag/bereich/neu/JJJJ-MM-TT (neu an einem Tag),
+ * #/eintrag/bereich/id (bearbeiten).
+ */
 async function eingabe(ziel) {
-  const [, bereichId, eintragId] = adresse();
+  const [, bereichId, teil, tagTeil] = adresse();
+  const vorgabeTag = teil === 'neu' && GUELTIGER_TAG.test(tagTeil ?? '') ? tagTeil : undefined;
+  let eintragId = teil === 'neu' ? undefined : teil;
   const bereich = bereichId === 'beispiel' ? BEISPIEL : await holen(SPEICHER.config, bereichId);
   if (!bereich || !BEREICHE[bereichId]) {
     ziel.innerHTML = `<section class="karte leer"><h2>Bereich nicht gefunden</h2>
       <p>„${esc(bereichId)}" ist nicht eingerichtet.</p><a class="knopf" href="#/uebersicht">Zur Übersicht</a></section>`;
     return;
   }
+  const tagesweise = bereich.zeitart === 'tag';
+  // Tagesweise Bereiche haben höchstens einen Eintrag pro Tag: vorhandenen öffnen statt neu anlegen.
+  if (!eintragId && tagesweise) eintragId = (await eintragAmTag(bereich.id, vorgabeTag ?? datumText()))?.id;
   const eintrag = eintragId ? await holen(SPEICHER.eintraege, eintragId) : undefined;
-  const zurueck = () => { location.hash = '#/uebersicht'; };
+  if (eintragId && !eintrag) {
+    ziel.innerHTML = `<section class="karte leer"><h2>Eintrag nicht gefunden</h2>
+      <p>Er wurde vielleicht gelöscht.</p><a class="knopf" href="#/uebersicht">Zur Übersicht</a></section>`;
+    return;
+  }
+  const herkunftsTag = (eintrag?.zeitpunkt ?? vorgabeTag ?? datumText()).slice(0, 10);
+  const zurueck = (tag = herkunftsTag) => { location.hash = tagAdresse(tag); };
   formularAnzeigen(ziel, {
     bereich,
     eintrag,
+    vorgabeTag,
     personen: await alle(SPEICHER.personen),
     personAnlegen: async (name) => {
       const person = { id: neueId(), name };
@@ -114,9 +105,16 @@ async function eingabe(ziel) {
         beispielErgebnis(ziel, neu);
         return;
       }
+      if (tagesweise) {
+        const vorhanden = await eintragAmTag(bereich.id, neu.zeitpunkt.slice(0, 10));
+        if (vorhanden && vorhanden.id !== neu.id) {
+          meldung('Für diesen Tag gibt es schon einen Eintrag.');
+          return;
+        }
+      }
       await speichern(SPEICHER.eintraege, neu);
       meldung('Gesichert');
-      zurueck();
+      zurueck(neu.zeitpunkt.slice(0, 10));
     },
     loeschen: async (alt) => {
       if (!confirm('Diesen Eintrag löschen?')) return;
@@ -125,6 +123,11 @@ async function eingabe(ziel) {
       zurueck();
     },
   });
+}
+
+async function eintragAmTag(bereichId, tag) {
+  const liste = await eintraegeZwischen(`${tag}T00:00`, `${tag}T23:59`);
+  return liste.find((e) => e.bereich === bereichId);
 }
 
 // Das Beispiel speichert nichts, es zeigt nur, was gespeichert würde.
@@ -137,8 +140,24 @@ function beispielErgebnis(ziel, eintrag) {
   karte.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function datenAnsicht() {
+  return `
+    ${kopf('Daten')}
+    <section class="karte leer" style="--farbe: var(--schlaf)">
+      <span class="symbol-gross">${symbol('sichern', 28)}</span>
+      <h2>Sichern und Wiederherstellen</h2>
+      <p>Folgt im nächsten Ausbauschritt.</p>
+      <a class="knopf" href="#/uebersicht">Zur Übersicht</a>
+    </section>`;
+}
+
 const ANSICHTEN = {
-  uebersicht,
+  uebersicht: () => {
+    const [, tag] = adresse();
+    const gueltig = GUELTIGER_TAG.test(tag ?? '') && tag <= datumText() ? tag : datumText();
+    return uebersicht(gueltig, speicherHinweis());
+  },
+  daten: datenAnsicht,
   genesung: () => spaeter('Genesung', '--genesung', 'genesung'),
   auswertung: () => spaeter('Auswertung', '--schlaf', 'auswertung'),
 };
@@ -148,7 +167,7 @@ async function zeichnen() {
   const istEingabe = pfad === 'eintrag';
   if (updateWartet && !istEingabe) { location.reload(); return; }
   document.body.classList.toggle('ohne-tabs', istEingabe);
-  tabsZeichnen(pfad);
+  tabsZeichnen(pfad === 'daten' ? 'uebersicht' : pfad);
   try {
     if (istEingabe) await eingabe(ansicht);
     else ansicht.innerHTML = await ANSICHTEN[pfad]();
@@ -157,7 +176,7 @@ async function zeichnen() {
     ansicht.innerHTML = `
       <section class="karte leer">
         <h2>Etwas ist schiefgelaufen</h2>
-        <p>${String(fehler.message ?? fehler)}</p>
+        <p>${esc(fehler.message ?? fehler)}</p>
       </section>`;
   }
   window.scrollTo(0, 0);

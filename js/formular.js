@@ -1,6 +1,6 @@
 // Eingabe-Bildschirm: Kopf mit Datum und Uhrzeit, Felder aus der Konfiguration, Sichern.
 import { symbol } from './symbole.js';
-import { esc, zeitpunktText, datumText, zeitpunktLesbar, tagLesbar, tageszeitVon } from './hilfen.js';
+import { esc, zeitpunktText, datumText, zeitpunktLesbar, tagLesbar, tagVoll, tageszeitVon } from './hilfen.js';
 import { BEREICHE, alleFelder } from './konfiguration.js';
 import { feldZeichnen, wertLesen, wertSetzen, bereinigen, feldFinden } from './felder.js';
 import { neueId } from './db.js';
@@ -18,7 +18,7 @@ export function formularAnzeigen(ziel, optionen) {
 
   const zustand = {
     werte: structuredClone(alt?.werte ?? {}),
-    zeitpunkt: alt?.zeitpunkt ?? (tagesweise ? `${optionen.vorgabeTag ?? datumText()}T00:00` : zeitpunktText()),
+    zeitpunkt: alt?.zeitpunkt ?? vorgabeZeitpunkt(tagesweise, optionen.vorgabeTag),
     personen: [...(optionen.personen ?? [])],
     ui: {},
   };
@@ -32,18 +32,20 @@ export function formularAnzeigen(ziel, optionen) {
 
   const ctx = () => ({ werte: zustand.werte, personen: zustand.personen, ui: zustand.ui });
 
-  const zeitAnzeige = () => (tagesweise
-    ? `${bereich.zeitTitel ? `${esc(bereich.zeitTitel)} ` : ''}${tagLesbar(zustand.zeitpunkt)}`
-    : zeitpunktLesbar(zustand.zeitpunkt));
+  const zeitAnzeige = () => {
+    if (!tagesweise) return zeitpunktLesbar(zustand.zeitpunkt);
+    // „Nacht auf Heute" liest sich schlecht, mit Beschriftung daher immer das volle Datum.
+    return bereich.zeitTitel ? `${bereich.zeitTitel} ${tagVoll(zustand.zeitpunkt)}` : tagLesbar(zustand.zeitpunkt);
+  };
 
   const wurzel = document.createElement('div');
-  wurzel.className = 'eingabe';
+  wurzel.className = `eingabe ${bereich.titelStil === 'frage' ? 'fragen' : ''}`;
   wurzel.style.setProperty('--farbe', `var(${art.farbe ?? '--schlaf'})`);
   wurzel.innerHTML = `
     <div class="eingabe-leiste">
       <button type="button" class="textknopf" data-aktion="abbrechen">Abbrechen</button>
       <label class="zeit-pille">
-        ${symbol(tagesweise ? 'kalender' : 'uhr', 16, 2.2)}<span data-zeit>${zeitAnzeige()}</span>
+        ${symbol(tagesweise ? 'kalender' : 'uhr', 16, 2.2)}<span data-zeit>${esc(zeitAnzeige())}</span>
         <input type="${tagesweise ? 'date' : 'datetime-local'}" data-zeitpunkt
           value="${esc(tagesweise ? zustand.zeitpunkt.slice(0, 10) : zustand.zeitpunkt)}"
           aria-label="${tagesweise ? 'Datum ändern' : 'Datum und Uhrzeit ändern'}">
@@ -95,9 +97,19 @@ export function formularAnzeigen(ziel, optionen) {
         wertSetzen(zustand.werte, pfad, aktuell === neu ? undefined : neu);
         break;
       }
-      case 'umschalten':
+      case 'umschalten': {
         wertSetzen(zustand.werte, pfad, aktuell ? undefined : {});
+        // Exklusive Optionen (z. B. „nichts") schließen alle anderen aus und umgekehrt.
+        const feld = feldFinden(bereich.felder, pfad[pfad.length - 2]);
+        const auswahl = wertLesen(zustand.werte, pfad.slice(0, -1));
+        if (!aktuell && feld && auswahl) {
+          const gewaehlt = (feld.optionen ?? []).find((o) => o.id === pfad[pfad.length - 1]);
+          for (const o of feld.optionen ?? []) {
+            if (o.id !== gewaehlt?.id && (gewaehlt?.exklusiv || o.exklusiv)) delete auswahl[o.id];
+          }
+        }
         break;
+      }
       case 'stufe':
         wertSetzen(zustand.werte, pfad, aktuell?.stufe === w ? undefined : { ...(aktuell ?? {}), stufe: w });
         break;
@@ -189,4 +201,12 @@ export function formularAnzeigen(ziel, optionen) {
       knopfEl.disabled = false;
     }
   }
+}
+
+/** Neuer Eintrag: heute jetzt, an einem anderen Tag dieselbe Uhrzeit an jenem Tag. */
+function vorgabeZeitpunkt(tagesweise, tag) {
+  const heute = datumText();
+  if (tagesweise) return `${tag ?? heute}T00:00`;
+  if (!tag || tag === heute) return zeitpunktText();
+  return `${tag}T${zeitpunktText().slice(11)}`;
 }

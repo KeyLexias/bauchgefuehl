@@ -16,6 +16,7 @@ export const SYMBOLE = {
   wiederherstellen: 'M12 21V9M7 14l5-5 5 5M5 3h14',
   plus: 'M12 5v14M5 12h14',
   zurueck: 'M15 5l-7 7 7 7',
+  weiter: 'M9 5l7 7-7 7',
   stern: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9z',
   person: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
   uhr: 'M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',

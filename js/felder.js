@@ -27,6 +27,9 @@ function optionSymbol(o, groesse = 20) {
   if (o.bild) {
     return `<svg aria-hidden="true" class="form" viewBox="${esc(o.bild.viewBox ?? '0 0 24 24')}" fill="currentColor"><path d="${esc(o.bild.d)}"/></svg>`;
   }
+  if (o.pfad) {
+    return `<svg aria-hidden="true" width="${groesse}" height="${groesse}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${esc(o.pfad)}"/></svg>`;
+  }
   return o.symbol ? symbol(o.symbol, groesse) : '';
 }
 
@@ -57,8 +60,9 @@ function einfachZeichnen(f, ctx, basis) {
   if (darst === 'pillen') {
     html = `<div class="pillen">${optionen.map((o) => k(o, 'pille', `${optionSymbol(o, 18)}${esc(o.titel)}`)).join('')}</div>`;
   } else if (darst === 'liste') {
-    html = `<div class="liste">${optionen.map((o) => k(o, 'zeile',
-      `<span class="zeile-bild">${optionSymbol(o, 22)}</span><span class="zeile-titel">${esc(o.titel)}</span>${o.kurz ? `<span class="etikett">${esc(o.kurz)}</span>` : ''}`)).join('')}</div>`;
+    const mitZeichen = optionen.some((o) => o.zeichen);
+    html = `<div class="liste">${optionen.map((o) => k(o, `zeile ${mitZeichen ? 'mit-zeichen' : ''}`,
+      `${mitZeichen ? `<span class="zeichen">${esc(o.zeichen ?? '')}</span>` : ''}<span class="zeile-bild">${optionSymbol(o, 22)}</span><span class="zeile-titel">${esc(o.titel)}</span>${o.kurz ? `<span class="etikett ${o.kurzTon ? `ton-${esc(o.kurzTon)}` : ''}">${esc(o.kurz)}</span>` : ''}`)).join('')}</div>`;
   } else if (darst === 'farben') {
     html = raster(f.spalten ?? 3, optionen.map((o) => k(o, 'farbe',
       `<span class="tupfer" style="background:${esc(o.farbe ?? 'transparent')}"></span>${esc(o.titel)}`)).join(''));
@@ -80,7 +84,7 @@ function mehrfachZeichnen(f, ctx, basis) {
   const auswahl = wertLesen(ctx.werte, pfad) ?? {};
   const optionen = sichtbar(f.optionen);
   const darst = f.darstellung ?? (f.stufen ? 'liste' : 'pillen');
-  const unterFelder = (o) => [...sichtbar(o.zusatz), ...sichtbar(f.jeOption)];
+  const unterFelder = (o) => [...sichtbar(o.zusatz), ...(o.ohneJeOption ? [] : sichtbar(f.jeOption))];
   const hinweise = [];
 
   // Fragen je gewählter Option. Schalter rücken in die Kopfzeile, der Rest darunter.
@@ -100,7 +104,7 @@ function mehrfachZeichnen(f, ctx, basis) {
   let html;
   if (f.stufen) {
     const stufen = sichtbar(f.stufen);
-    html = `<div class="liste">${optionen.map((o) => {
+    const zeile = (o) => {
       const gew = auswahl[o.id];
       if (gew && o.hinweis) hinweise.push(o.hinweis);
       const knoepfe = stufen.map((s) => knopf({
@@ -112,7 +116,15 @@ function mehrfachZeichnen(f, ctx, basis) {
           <span class="zeile-titel">${esc(o.titel)}</span>
           <div class="stufen" style="--spalten:${stufen.length}">${knoepfe}</div>
         </div>${gew ? optionsFragen(o, false) : ''}`;
-    }).join('')}</div>`;
+    };
+    // Optionen mit gleicher „gruppe" stehen in einer eigenen Liste mit Zwischentitel.
+    const gruppen = [];
+    for (const o of optionen) {
+      const g = gruppen.find((x) => x.name === (o.gruppe ?? ''));
+      if (g) g.optionen.push(o); else gruppen.push({ name: o.gruppe ?? '', optionen: [o] });
+    }
+    html = gruppen.map((g) => `${g.name ? `<h3 class="gruppe">${esc(g.name)}</h3>` : ''}
+      <div class="liste">${g.optionen.map(zeile).join('')}</div>`).join('');
   } else {
     const k = (o, klasse, inhalt) => knopf({ pfad: [...pfad, o.id], aktion: 'umschalten', an: !!auswahl[o.id], klasse, inhalt });
     if (darst === 'kacheln') {
@@ -178,7 +190,12 @@ function personZeichnen(f, ctx, basis) {
          <button type="submit" class="wahl pille">Hinzufügen</button>
        </form>`
     : `<button type="button" class="wahl pille zart" data-aktion="person-neu" ${pfadAttr(pfad)}>${symbol('plus', 18)}Person</button>`;
-  return `<div class="pillen">${knoepfe}${neu}</div>`;
+  let html = `<div class="pillen">${knoepfe}${neu}</div>`;
+  // Zusatzfragen erscheinen, sobald mindestens eine Person gewählt ist.
+  if (gewaehlt.length && sichtbar(f.zusatz).length) {
+    html += `<div class="zusatz">${sichtbar(f.zusatz).map((z) => feldZeichnen(z, ctx, basis, true)).join('')}</div>`;
+  }
+  return html;
 }
 
 function zahlZeichnen(f, ctx, basis) {
@@ -251,7 +268,8 @@ export function feldZeichnen(f, ctx, basis = [], verschachtelt = false) {
   const zeichner = ZEICHNER[f.typ];
   const inhalt = zeichner ? zeichner(f, ctx, basis) : `<p class="fussnote">Unbekannter Feldtyp „${esc(f.typ)}".</p>`;
   const wurzel = verschachtelt ? '' : `data-wurzel="${esc(f.id)}"`;
-  return `<section class="feld ${verschachtelt ? 'verschachtelt' : ''}" ${wurzel}>
+  const farbe = f.farbe && /^[a-z]+$/.test(f.farbe) ? ` style="--farbe: var(--${f.farbe})"` : '';
+  return `<section class="feld ${verschachtelt ? 'verschachtelt' : ''} ${farbe ? 'eigene-farbe' : ''}" ${wurzel}${farbe}>
       <h2 class="feld-titel">${esc(f.titel)}${f.optional ? '<span class="optional"> · optional</span>' : ''}</h2>
       ${inhalt}
       ${f.hilfe ? `<p class="feld-hilfe">${esc(f.hilfe)}</p>` : ''}
@@ -276,12 +294,15 @@ export function bereinigen(felder, quelle, ziel = {}) {
         const opt = (f.optionen ?? []).find((o) => o.id === oid);
         if (!opt) { aus[oid] = inhalt; continue; } // Option nicht mehr in der Konfiguration: Wert behalten
         const neu = inhalt?.stufe ? { stufe: inhalt.stufe } : {};
-        bereinigen([...(opt.zusatz ?? []), ...(f.jeOption ?? [])], inhalt, neu);
+        bereinigen([...(opt.zusatz ?? []), ...(opt.ohneJeOption ? [] : (f.jeOption ?? []))], inhalt, neu);
         aus[oid] = neu;
       }
       if (Object.keys(aus).length) ziel[f.id] = aus;
     } else if (f.typ === 'person') {
-      if (v.length) ziel[f.id] = v;
+      if (v.length) {
+        ziel[f.id] = v;
+        if (f.zusatz) bereinigen(f.zusatz, quelle, ziel);
+      }
     } else {
       ziel[f.id] = v;
     }
@@ -297,7 +318,7 @@ export function feldFinden(felder, id) {
       const z = feldFinden(o.zusatz, id);
       if (z) return z;
     }
-    const j = feldFinden(f.jeOption, id);
+    const j = feldFinden(f.jeOption, id) ?? feldFinden(f.zusatz, id);
     if (j) return j;
   }
   return undefined;

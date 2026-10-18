@@ -45,6 +45,13 @@ export function tagLesbar(text) {
   return fmtTag.format(alsDatum(tag));
 }
 
+const fmtVoll = new Intl.DateTimeFormat('de-AT', { weekday: 'short', day: 'numeric', month: 'short' });
+
+/** „So., 18. Okt." */
+export function tagVoll(text) {
+  return fmtVoll.format(alsDatum(String(text).slice(0, 10)));
+}
+
 export function zeitpunktLesbar(text) {
   return `${tagLesbar(text)}, ${fmtUhr.format(alsDatum(text))}`;
 }

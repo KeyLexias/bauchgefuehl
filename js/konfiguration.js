@@ -6,6 +6,10 @@
 //   untertitel optional, kleine Zeile unter der Überschrift
 //   zeitart    'zeitpunkt' (Datum und Uhrzeit) oder 'tag' (nur Datum)
 //   zeitTitel  optional, Beschriftung vor dem Datum, z. B. „Nacht auf"
+//   kurztitel  Name auf der Übersicht
+//   reihenfolge  Position auf der Übersicht
+//   titelStil  'frage' zeigt Feldtitel als ganze Fragen statt als Abschnittstitel
+//   zusammenfassung  Feld-Ids, die auf der Übersicht als Kurztext erscheinen
 //   felder     Liste von Feldern
 //
 // Feld:
@@ -23,13 +27,20 @@
 //             spalten (bei kacheln und farben)
 //   mehrfach: stufen optional, z. B. [{ id, titel }], dann je gewählter Option eine Stufe
 //             jeOption optional, Felder, die für jede gewählte Option gefragt werden
+//             gruppe je Option: Zwischentitel in der Liste mit Stufen
+//             exklusiv je Option: wählt alle anderen ab, z. B. „nichts"
+//             ohneJeOption je Option: jeOption-Felder entfallen für diese Option
+//   person:   zusatz optional, erscheint sobald eine Person gewählt ist (Werte flach daneben)
 //   zahl:     einheit, schritt, min, max, nachkomma
 //   dauer:    stufen [{ id, titel, minuten }] oder ohne stufen freie Eingabe in Minuten
 //   janein:   darstellung 'knoepfe' | 'schalter'
-//   person, tageszeit, datumzeit, text: keine weiteren Angaben
+//   tageszeit, datumzeit, text: keine weiteren Angaben
+//   farbe     optional, Bereichsname, dessen Farbe das Feld bekommt, z. B. 'genesung'
+//   kurz      optional, kurze Bezeichnung für Zusammenfassungen
 //
 // Option:
-//   id, titel, symbol (Name aus symbole.js), farbe (#RRGGBB),
+//   id, titel, kurztitel (für Zusammenfassungen), symbol (Name aus symbole.js) oder pfad (eigener SVG-Pfad),
+//   farbe (#RRGGBB), zeichen (große Ziffer vorne in der Liste), kurzTon ('gut' | 'mittel' | 'schlecht'),
 //   bild { d, viewBox } für eigene Formen, kurz (kleines Etikett rechts in der Liste),
 //   hinweis (Text, der erscheint, sobald die Option gewählt ist),
 //   zusatz (Felder, die direkt darunter aufklappen, wenn die Option gewählt ist),
@@ -67,7 +78,7 @@ export function alleFelder(felder) {
   for (const f of felder ?? []) {
     liste.push(f);
     for (const o of f.optionen ?? []) liste.push(...alleFelder(o.zusatz));
-    liste.push(...alleFelder(f.jeOption));
+    liste.push(...alleFelder(f.jeOption), ...alleFelder(f.zusatz));
   }
   return liste;
 }

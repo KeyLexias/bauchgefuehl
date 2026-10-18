@@ -70,6 +70,11 @@ export async function alle(speicher) {
 }
 
 /** Einträge eines Zeitraums, Zeitpunkt als ISO-Text „JJJJ-MM-TTTHH:MM". */
+export async function anzahl(speicher) {
+  const db = await oeffnen();
+  return alsPromise(db.transaction(speicher).objectStore(speicher).count());
+}
+
 export async function eintraegeZwischen(von, bis) {
   const db = await oeffnen();
   const index = db.transaction(SPEICHER.eintraege).objectStore(SPEICHER.eintraege).index('zeitpunkt');

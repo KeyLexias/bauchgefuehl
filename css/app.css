@@ -268,7 +268,7 @@ body.ohne-tabs .ansicht { padding-bottom: calc(24px + var(--abstand-unten)); }
 
 /* Zeilen mit Stärke-Stufen */
 .stufen-zeile {
-  display: grid; grid-template-columns: 32px minmax(0, 1fr) minmax(0, 186px); gap: 8px; align-items: center;
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) minmax(0, 156px); gap: 8px; align-items: center;
   padding: 4px 6px;
 }
 .zeile-symbol {
@@ -276,7 +276,7 @@ body.ohne-tabs .ansicht { padding-bottom: calc(24px + var(--abstand-unten)); }
   display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--farbe) 14%, transparent); color: var(--farbe);
 }
-.stufen-zeile .zeile-titel { font-size: 15px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.stufen-zeile .zeile-titel { font-size: 15px; font-weight: 600; min-width: 0; -webkit-hyphens: auto; hyphens: auto; }
 .stufen { display: grid; grid-template-columns: repeat(var(--spalten, 3), minmax(0, 1fr)); gap: 4px; }
 .stufe { border-radius: 11px; font-size: 13px; padding: 0 2px; }
 .liste .stufe:not([aria-pressed="true"]),
@@ -352,3 +352,94 @@ textarea.eingabe-feld { resize: vertical; min-height: 88px; }
   background: rgba(28, 28, 30, 0.92); color: #FFFFFF; padding: 10px 18px; border-radius: 20px;
   font-size: 15px; font-weight: 600; z-index: 20; pointer-events: none;
 }
+
+/* ---------- Übersicht ---------- */
+.kopf-zeile { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tag-wechsel { display: flex; gap: 6px; }
+.rund-knopf {
+  width: var(--tippen); height: var(--tippen); border-radius: 22px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--karte); color: var(--text-2);
+}
+.zu-heute { font-size: 13px; font-weight: 600; color: var(--schlaf); padding: 6px 0; }
+a.banner { text-decoration: none; }
+.textlink { color: var(--farbe, var(--schlaf)); font-weight: 600; font-size: 15px; padding: 10px; }
+.fussnote.links { text-align: left; padding: 0; }
+
+.schnell-raster { display: grid; grid-template-columns: repeat(var(--spalten, 3), minmax(0, 1fr)); gap: 10px; }
+.schnell {
+  background: var(--farbe); color: #FFFFFF; border-radius: var(--radius);
+  padding: 14px 12px; min-height: 92px;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
+  font-size: 15px; font-weight: 600;
+}
+@media (prefers-color-scheme: dark) {
+  .schnell { background: color-mix(in srgb, var(--farbe) 62%, #000000); }
+}
+.schnell-symbol {
+  width: 36px; height: 36px; border-radius: 11px; background: rgba(255, 255, 255, 0.22);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.tageskarten { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tageskarte {
+  background: var(--karte); border-radius: var(--radius); padding: 14px; min-height: 112px;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
+}
+.tageskarte-kopf { display: flex; justify-content: space-between; align-items: center; }
+.tageskarte-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tageskarte-text strong { font-size: 16px; }
+.tageskarte-text span { font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
+.symbol-klein {
+  width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--farbe) 16%, transparent); color: var(--farbe);
+}
+.status {
+  font-size: 12px; font-weight: 700; border-radius: 10px; padding: 3px 8px;
+  background: var(--fuellung); color: var(--text-2);
+}
+.status.erledigt { background: color-mix(in srgb, var(--uebung) 16%, transparent); color: var(--uebung); }
+
+.eintraege { padding: 4px 14px; display: flex; flex-direction: column; }
+.eintrag-zeile {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) 18px; gap: 12px; align-items: center;
+  padding: 10px 0; min-height: 56px; border-bottom: 1px solid var(--linie); color: var(--text);
+}
+.eintrag-zeile:last-child { border-bottom: 0; }
+.eintrag-zeile > svg { color: var(--text-3); }
+.eintrag-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.eintrag-titel { display: flex; justify-content: space-between; gap: 8px; font-size: 16px; }
+.eintrag-titel span { color: var(--text-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+.eintrag-inhalt { font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Ergänzungen Eingabe ---------- */
+.eingabe .eigene-farbe {
+  --voll: var(--farbe);
+  --zart: color-mix(in srgb, var(--farbe) 12%, var(--karte));
+}
+@media (prefers-color-scheme: dark) {
+  .eingabe .eigene-farbe {
+    --voll: color-mix(in srgb, var(--farbe) 62%, #000000);
+    --zart: color-mix(in srgb, var(--farbe) 16%, var(--karte));
+  }
+}
+.eingabe.fragen .feld:not(.verschachtelt) > .feld-titel {
+  text-transform: none; letter-spacing: 0; font-size: 16px; font-weight: 600; color: var(--text);
+}
+.gruppe {
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-2);
+  margin: 6px 0 -2px 4px;
+}
+.zeile.mit-zeichen { grid-template-columns: 26px 52px minmax(0, 1fr) auto; }
+.zeichen { font-family: var(--rund); font-size: 20px; font-weight: 700; text-align: center; }
+.etikett.ton-gut { background: color-mix(in srgb, #16A34A 16%, transparent); color: #15803D; }
+.etikett.ton-mittel { background: color-mix(in srgb, #D97706 18%, transparent); color: #92400E; }
+.etikett.ton-schlecht { background: color-mix(in srgb, #DC2626 14%, transparent); color: #B91C1C; }
+@media (prefers-color-scheme: dark) {
+  .etikett.ton-gut { color: #4ADE80; }
+  .etikett.ton-mittel { color: #FBBF24; }
+  .etikett.ton-schlecht { color: #F87171; }
+}
+.zeile[aria-pressed="true"] .etikett { background: rgba(255, 255, 255, 0.22); color: #FFFFFF; }
+.kachel .form { width: 24px; height: 24px; }
