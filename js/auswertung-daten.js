@@ -133,7 +133,9 @@ export const tagesWert = (t, schluessel) => schnitt(t?.zahlen.get(schluessel) ??
 // ---------- Laden und Zeitraum ----------
 
 export async function auswertungLaden() {
-  const [configs, eintraege, personen] = await Promise.all([alle(SPEICHER.config), alle(SPEICHER.eintraege), alle(SPEICHER.personen)]);
+  const [configs, eintraege, personen, healthTage] = await Promise.all([
+    alle(SPEICHER.config), alle(SPEICHER.eintraege), alle(SPEICHER.personen), alle(SPEICHER.health),
+  ]);
   const bereiche = configs
     .filter((b) => BEREICHE[b.id] && b.id !== GENESUNG && b.felder?.length && !b.ausgeblendet)
     .sort((a, b) => (a.reihenfolge ?? 99) - (b.reihenfolge ?? 99));
@@ -145,7 +147,8 @@ export async function auswertungLaden() {
     const t = e.zeitpunkt.slice(0, 10);
     if (!ersterJe[e.bereich] || t < ersterJe[e.bereich]) ersterJe[e.bereich] = t;
   }
-  return { configs, bereiche, genesung, eintraege, personen, tage, erster, ersterJe };
+  const health = new Map(healthTage.map((d) => [d.tag, d]));
+  return { configs, bereiche, genesung, eintraege, personen, tage, erster, ersterJe, health };
 }
 
 export const bereich = (k, id) => k.bereiche.find((b) => b.id === id);
@@ -246,7 +249,93 @@ export function messreihen(k) {
     }
   }
   for (const s of schmerzReihen(k)) reihen.push(s);
+  for (const r of healthReihen(k)) reihen.push(r);
   return reihen;
+}
+
+// ---------- Health-Daten ----------
+
+const minutenSumme = (liste) => (liste ?? []).reduce((n, x) => n + (x.minuten ?? 0), 0);
+
+/** Tageswerte aus dem Health-Import. Jede Art: { id, titel, einheit, stellen, wert(tag) }, Tage ohne Wert liefern null. */
+export const HEALTH_WERTE = {
+  schlaf: { titel: 'Schlafdauer', einheit: 'h', stellen: 1, wert: (d) => (d.schlaf?.dauer ? d.schlaf.dauer / 60 : null) },
+  training: { titel: 'Training', einheit: 'min', stellen: 0, wert: (d) => minutenSumme(d.training), abErstem: true },
+  kcal: { titel: 'Gegessen', einheit: 'kcal', stellen: 0, wert: (d) => d.ernaehrung?.kcal ?? null },
+  eiweiss: { titel: 'Eiweiß', einheit: 'g', stellen: 0, wert: (d) => d.ernaehrung?.eiweiss ?? null },
+  kohlenhydrate: { titel: 'Kohlenhydrate', einheit: 'g', stellen: 0, wert: (d) => d.ernaehrung?.kohlenhydrate ?? null },
+  fett: { titel: 'Fett', einheit: 'g', stellen: 0, wert: (d) => d.ernaehrung?.fett ?? null },
+  zucker: { titel: 'Zucker', einheit: 'g', stellen: 0, wert: (d) => d.ernaehrung?.zucker ?? null },
+  ballaststoffe: { titel: 'Ballaststoffe', einheit: 'g', stellen: 1, wert: (d) => d.ernaehrung?.ballaststoffe ?? null },
+  wasser: { titel: 'Wasser', einheit: 'ml', stellen: 0, wert: (d) => d.ernaehrung?.wasser ?? null },
+  ruhepuls: { titel: 'Ruhepuls', einheit: 'Schläge/min', stellen: 0, wert: (d) => d.ruhepuls ?? null },
+  hrv: { titel: 'HRV', einheit: 'ms', stellen: 0, wert: (d) => d.hrv ?? null },
+  atemfrequenz: { titel: 'Atemfrequenz', einheit: 'Atemzüge/min', stellen: 1, wert: (d) => d.atemfrequenz ?? null },
+  sauerstoff: { titel: 'Blutsauerstoff', einheit: '%', stellen: 1, wert: (d) => d.sauerstoff ?? null },
+  temperatur: { titel: 'Handgelenk-Temperatur', einheit: '°C', stellen: 2, wert: (d) => d.temperatur ?? null },
+  gewicht: { titel: 'Gewicht', einheit: 'kg', stellen: 1, wert: (d) => d.gewicht ?? null },
+  schritte: { titel: 'Schritte', einheit: '', stellen: 0, wert: (d) => d.schritte ?? null },
+  aktivEnergie: { titel: 'Aktive Energie', einheit: 'kcal', stellen: 0, wert: (d) => d.aktivEnergie ?? null },
+  tageslicht: { titel: 'Tageslicht', einheit: 'min', stellen: 0, wert: (d) => d.tageslicht ?? null },
+  achtsamkeit: { titel: 'Achtsamkeit', einheit: 'min', stellen: 0, wert: (d) => d.achtsamkeit ?? null },
+};
+
+/**
+ * Tagesfunktion für einen Health-Wert. Bei Arten mit abErstem (z. B. Training) zählt ein Tag mit Health-Daten,
+ * aber ohne Wert als 0, erst ab dem ersten Tag mit Wert.
+ */
+export function healthWertAm(k, id) {
+  const art = HEALTH_WERTE[id];
+  if (!art) return () => null;
+  let erster = null;
+  if (art.abErstem) {
+    for (const d of k.health.values()) if (art.wert(d) && (!erster || d.tag < erster)) erster = d.tag;
+  }
+  return (t) => {
+    const d = k.health.get(t);
+    if (!d) return null;
+    if (art.abErstem) return erster && t >= erster ? art.wert(d) : null;
+    const v = art.wert(d);
+    return v === null || v === undefined ? null : v;
+  };
+}
+
+/** Hat irgendein Tag einen Wert dieser Art? */
+export const healthHat = (k, id) => [...k.health.values()].some((d) => { const v = HEALTH_WERTE[id]?.wert(d); return v !== null && v !== undefined && v !== 0; });
+
+/** Verläufe aus Health für Überblick und Zeitstrahl: Schlafdauer, Training, Gegessen. */
+export function healthReihen(k) {
+  const auswahl = [
+    { id: 'schlaf', farbe: '--schlaf', ansicht: 'schlaf' },
+    { id: 'training', farbe: '--aktivitaet', ansicht: 'tag', einheit: 'min/Tag' },
+    { id: 'kcal', farbe: '--ernaehrung', ansicht: 'ernaehrung' },
+  ];
+  return auswahl.filter((r) => healthHat(k, r.id)).map((r) => {
+    const art = HEALTH_WERTE[r.id];
+    return {
+      id: `health.${r.id}`, titel: art.titel, farbe: r.farbe, ansicht: r.ansicht, einheit: r.einheit ?? art.einheit,
+      stellen: art.stellen, min: 0, frei: true, wertAm: healthWertAm(k, r.id),
+    };
+  });
+}
+
+/** Health-Tage im Zeitraum, aufsteigend. */
+export function healthIm(k, von, bis) {
+  const liste = [];
+  for (let t = von; t <= bis; t = tageVerschieben(t, 1)) if (k.health.has(t)) liste.push(k.health.get(t));
+  return liste;
+}
+
+/** „HH:MM" als Minuten; Zeiten vor `wende` Uhr zählen zum Folgetag, damit Mitternacht nicht den Schnitt verzerrt. */
+export function uhrMinuten(text, wende = 12) {
+  if (!text) return null;
+  const [h, m] = text.split(':').map(Number);
+  return (h < wende ? h + 24 : h) * 60 + m;
+}
+export function uhrText(minuten) {
+  if (minuten === null || minuten === undefined) return '–';
+  const m = Math.round(minuten) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
 /** Schmerz 0–10 je Beschwerde, die schon Werte hat. */

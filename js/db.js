@@ -1,12 +1,13 @@
 // Speicher in IndexedDB. Jede Änderung wird sofort geschrieben.
 const NAME = 'bauchgefuehl';
-const VERSION = 1;
+const VERSION = 2;
 
 export const SPEICHER = {
   config: 'config',       // Konfiguration der Bereiche, Fragen und Optionen
   eintraege: 'eintraege', // alle Einträge, je mit Bereich und Zeitpunkt
   personen: 'personen',   // in der App gepflegte Personenliste
   meta: 'meta',           // z. B. Zeitpunkt der letzten Sicherung
+  health: 'health',       // Tageswerte aus dem Health-Import, je Datum ein Objekt
 };
 
 let verbindung;
@@ -30,6 +31,9 @@ function oeffnen() {
       }
       if (!db.objectStoreNames.contains(SPEICHER.meta)) {
         db.createObjectStore(SPEICHER.meta, { keyPath: 'schluessel' });
+      }
+      if (!db.objectStoreNames.contains(SPEICHER.health)) {
+        db.createObjectStore(SPEICHER.health, { keyPath: 'tag' });
       }
     };
     anfrage.onsuccess = () => {
@@ -106,6 +110,17 @@ export async function vieleSpeichern(inhalt) {
     const s = tx.objectStore(name);
     for (const objekt of inhalt[name]) s.put(objekt);
   }
+  await fertig(tx);
+}
+
+/** Löscht und speichert in einer Transaktion: loeschen { speicher: [Schlüssel] }, speichern { speicher: [Objekte] }. */
+export async function aendern({ loeschen: weg = {}, speichern: neu = {} }) {
+  const namen = [...new Set([...Object.keys(weg), ...Object.keys(neu)])];
+  if (!namen.length) return;
+  const db = await oeffnen();
+  const tx = db.transaction(namen, 'readwrite');
+  for (const [name, schluessel] of Object.entries(weg)) for (const k of schluessel) tx.objectStore(name).delete(k);
+  for (const [name, objekte] of Object.entries(neu)) for (const o of objekte) tx.objectStore(name).put(o);
   await fertig(tx);
 }
 

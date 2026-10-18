@@ -9,7 +9,9 @@ import {
   ZEITRAEUME, VERLAUF_ROLLEN, MINDEST_TAGE, auswertungLaden, zeitraum, eintraegeIm, verlauf, kennzahl, messreihen, schmerzReihen,
   bereichStatistik, optionsZeilen, warnzeichen, symptomFelder, ergebnisse, sondertagPruefer, essensMerkmale, wortMerkmal,
   tagesMerkmale, anteilVergleich, wertVergleich, tagesWert, tageszeitEintrag, zaehlt, erfassteTage, TAGESZEIT_SPALTEN, titelVon, feldTitel, abschnitte,
+  HEALTH_WERTE, healthWertAm, healthHat, healthIm, uhrMinuten, uhrText, schnitt,
 } from './auswertung-daten.js';
+import { trainingsName, QUELLE as HEALTH_QUELLE } from './health-import.js';
 import { uebungsEintraege, termine, umrechnen, wertAnzeige, STATUS } from './genesung-daten.js';
 import { arztbericht } from './arztbericht.js';
 
@@ -17,6 +19,7 @@ export const ANSICHTEN = [
   { id: 'ueberblick', titel: 'Überblick' },
   { id: 'bauch', titel: 'Bauch', bereiche: ['magen', 'stuhlgang'] },
   { id: 'ausloeser', titel: 'Auslöser' },
+  { id: 'ernaehrung', titel: 'Ernährung' },
   { id: 'schlaf', titel: 'Schlaf', bereiche: ['schlaf'] },
   { id: 'tag', titel: 'Tag', bereiche: ['aktivitaeten'] },
   { id: 'genesung', titel: 'Genesung' },
@@ -83,7 +86,7 @@ export async function auswertungAnzeigen(ziel, teile) {
     for (const b of wurzel.querySelectorAll('[data-ansicht]')) b.setAttribute('aria-pressed', String(b.dataset.ansicht === zustand.ansicht));
     const z = zeitraum(k, zustand.zeitraum);
     wurzel.querySelector('[data-zeitraum-text]').textContent = `${tagLang(z.von)} bis ${tagLang(z.bis)} · ${tageText(z.tage)}`;
-    const ansicht = { ueberblick, bauch: bereichsAnsicht, schlaf: bereichsAnsicht, tag: bereichsAnsicht, ausloeser, genesung, bericht }[zustand.ansicht];
+    const ansicht = { ueberblick, bauch: bereichsAnsicht, schlaf: bereichsAnsicht, tag: bereichsAnsicht, ausloeser, ernaehrung, genesung, bericht }[zustand.ansicht];
     inhalt.innerHTML = ansicht(k, z, ANSICHTEN.find((a) => a.id === zustand.ansicht));
     const gewaehlt = wurzel.querySelector('[data-ansicht][aria-pressed="true"]');
     gewaehlt?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: scrollen ? 'smooth' : 'auto' });
@@ -136,12 +139,13 @@ function ueberblick(k, z) {
   const kacheln = reihen.map((r) => {
     const jetzt = kennzahl(z.von, z.bis, r.wertAm);
     const vorher = z.vorher ? kennzahl(z.vorher.von, z.vorher.bis, r.wertAm) : null;
-    const einheit = r.anzahl ? 'pro Tag' : `von ${r.max}`;
-    const vergleichText = vorher?.anzahl ? `davor ${zahl(vorher.wert, 1)}` : jetzt.anzahl ? tageText(jetzt.anzahl) : 'keine Werte';
+    const einheit = r.einheit ?? (r.anzahl ? 'pro Tag' : `von ${r.max}`);
+    const stellen = r.stellen ?? 1;
+    const vergleichText = vorher?.anzahl ? `davor ${zahl(vorher.wert, stellen)}` : jetzt.anzahl ? tageText(jetzt.anzahl) : 'keine Werte';
     return `
       <button type="button" class="kennzahl" data-ansicht="${r.ansicht}" style="--farbe: var(${r.farbe})">
         <span class="kennzahl-titel">${esc(r.titel)}</span>
-        <span class="kennzahl-wert"><strong>${zahl(jetzt.wert, 1)}</strong> ${esc(einheit)}</span>
+        <span class="kennzahl-wert"><strong>${zahl(jetzt.wert, stellen)}</strong> ${esc(einheit)}</span>
         <span class="kennzahl-unter">${esc(vergleichText)}</span>
       </button>`;
   }).join('');
@@ -152,8 +156,8 @@ function ueberblick(k, z) {
     if (punkte.filter((p) => p.wert !== null).length < 2) return '';
     return `
       <div class="zeitstrahl-zeile" style="--farbe: var(${r.farbe})">
-        <span class="zeitstrahl-titel">${esc(r.titel)}<small>${r.anzahl ? 'pro Tag' : `${r.min}–${r.max}`}</small></span>
-        ${linie(punkte, { min: r.min, max: r.anzahl ? Math.max(r.max, ...punkte.map((p) => p.wert ?? 0)) : r.max, beschriftung: `${r.titel} im Verlauf`, hoehe: 46, achse: false })}
+        <span class="zeitstrahl-titel">${esc(r.titel)}<small>${esc(r.einheit ?? (r.anzahl ? 'pro Tag' : `${r.min}–${r.max}`))}</small></span>
+        ${linie(punkte, { ...grenzen(r, punkte), beschriftung: `${r.titel} im Verlauf`, hoehe: 46, achse: false })}
       </div>`;
   }).join('');
   const einheit = { tag: 'Tag', woche: 'Woche', monat: 'Monat' }[z.art];
@@ -181,6 +185,13 @@ function ueberblick(k, z) {
     { sym: 'kalender', unter: sondertage.vorhanden ? `Tage mit ${esc(sondertage.titel.join(', '))} zählen bei Zusammenhängen standardmäßig nicht mit.` : '' }) : ''}`;
 }
 
+/** Achse einer Zeitstrahl-Zeile: feste Skalen von min bis max, frei skalierte (Health) über den Wertebereich. */
+function grenzen(r, punkte) {
+  const werte = punkte.map((p) => p.wert).filter((v) => v !== null);
+  if (r.frei) return { min: Math.min(...werte) * 0.85, max: Math.max(...werte, 1) };
+  return { min: r.min, max: r.anzahl ? Math.max(r.max, ...werte) : r.max };
+}
+
 // ---------- Bereiche (Bauch, Schlaf, Tag) ----------
 
 function bereichsAnsicht(k, z, ansicht) {
@@ -193,7 +204,189 @@ function bereichsAnsicht(k, z, ansicht) {
     ansicht.id === 'bauch' ? tageszeitKarte(k, z, bereiche) : '',
     ...rest.map((b) => bereichKarten(k, z, b)),
     ansicht.id === 'schlaf' ? vortagKarte(k, z, erster) : '',
+    ansicht.id === 'schlaf' ? uhrSchlafKarten(k, z) : '',
+    ansicht.id === 'tag' ? bewegungKarten(k, z) : '',
   ].join('');
+}
+
+// ---------- Health-Daten ----------
+
+/** Kacheln mit Schnitt im Zeitraum und davor, je Health-Wert mit Daten. */
+function healthKacheln(k, z, ids) {
+  const kacheln = ids.filter((id) => healthHat(k, id)).map((id) => {
+    const art = HEALTH_WERTE[id];
+    const wertAm = healthWertAm(k, id);
+    const jetzt = kennzahl(z.von, z.bis, wertAm);
+    const vorher = z.vorher ? kennzahl(z.vorher.von, z.vorher.bis, wertAm) : null;
+    const unter = jetzt.anzahl ? `${vorher?.anzahl ? `davor ${zahl(vorher.wert, art.stellen)} · ` : ''}${tageText(jetzt.anzahl)}` : 'keine Werte';
+    return `
+      <div class="kennzahl">
+        <span class="kennzahl-titel">${esc(art.titel)}</span>
+        <span class="kennzahl-wert"><strong>${zahl(jetzt.wert, art.stellen)}</strong> ${esc(art.einheit)}</span>
+        <span class="kennzahl-unter">${esc(unter)}</span>
+      </div>`;
+  });
+  return kacheln.length ? `<div class="kennzahlen">${kacheln.join('')}</div>` : '';
+}
+
+/** Linie eines Health-Werts über den Zeitraum, Achse von 0 (oder knapp unter dem kleinsten Wert) bis zum größten. */
+function healthLinie(k, z, id, { abNull = true } = {}) {
+  const art = HEALTH_WERTE[id];
+  const punkte = verlauf(z, healthWertAm(k, id));
+  const werte = punkte.map((p) => p.wert).filter((v) => v !== null);
+  const min = abNull ? 0 : Math.floor(Math.min(...werte) * 0.97);
+  return linie(punkte, { min, max: rundeGrenze(Math.max(...werte, 1)), beschriftung: `${art.titel} im Verlauf`, format: (v) => zahl(v, Number.isInteger(v) ? 0 : 1) });
+}
+
+/** Nächste runde Obergrenze für eine Achse: 8,4 → 10 (Mitte 5), 3.720 → 4.000, 58 → 60. */
+function rundeGrenze(x) {
+  const schritt = 10 ** Math.floor(Math.log10(x));
+  const g = Math.ceil(x / schritt) * schritt;
+  return g % 2 && g / schritt < 10 ? g + schritt : g;
+}
+
+/** Schlaf laut Uhr: Dauer, Uhrzeiten, Phasen; dazu die Nachtwerte. */
+function uhrSchlafKarten(k, z) {
+  if (!healthHat(k, 'schlaf')) return '';
+  const naechte = healthIm(k, z.von, z.bis).filter((d) => d.schlaf?.dauer);
+  if (!naechte.length) return karte(farbeVon('schlaf'), 'Schlaf laut Uhr', '<p class="fussnote links">Keine Nächte im Zeitraum.</p>', { sym: 'schlaf' });
+  const einschlafen = schnitt(naechte.map((d) => uhrMinuten(d.schlaf.einschlafen)).filter((v) => v !== null));
+  const aufwachen = schnitt(naechte.map((d) => uhrMinuten(d.schlaf.aufwachen, 18)).filter((v) => v !== null));
+  const mitPhasen = naechte.filter((d) => d.schlaf.tief !== undefined);
+  const phasen = [['tief', 'Tiefschlaf'], ['kern', 'Kernschlaf'], ['rem', 'REM'], ['wach', 'Wach']];
+  const phasenSchnitt = phasen.map(([id, titel]) => ({ id, titel, minuten: schnitt(mitPhasen.map((d) => d.schlaf[id] ?? 0)) ?? 0 }));
+  const summe = phasenSchnitt.reduce((n, p) => n + p.minuten, 0) || 1;
+  const dauerText = (min) => `${Math.floor(min / 60)} h ${String(Math.round(min % 60)).padStart(2, '0')} min`;
+  const schlafDauer = schnitt(naechte.map((d) => d.schlaf.dauer));
+  return `
+    ${karte(farbeVon('schlaf'), 'Schlaf laut Uhr', `
+      ${healthLinie(k, z, 'schlaf')}
+      <div class="info-zeilen">
+        <div><span>Eingeschlafen</span><strong>${uhrText(einschlafen)}</strong></div>
+        <div><span>Aufgewacht</span><strong>${uhrText(aufwachen)}</strong></div>
+      </div>
+      ${mitPhasen.length ? `<h3 class="teil-titel">Schlafphasen im Schnitt</h3>${balken(phasenSchnitt.map((p) => ({ titel: p.titel, anzahl: p.minuten, text: `${zahl(p.minuten, 0)} min · ${prozent(p.minuten / summe)}` })))}` : ''}`,
+    { sym: 'schlaf', unter: `Schnitt <strong>${dauerText(schlafDauer)}</strong> Schlaf an ${tagen(naechte.length)}. Gemessen von der Uhr, ohne Wachphasen.` })}
+    ${karte(farbeVon('schlaf'), 'Nachtwerte und Herz', healthKacheln(k, z, ['ruhepuls', 'hrv', 'atemfrequenz', 'sauerstoff', 'temperatur']),
+    { sym: 'herz', unter: 'Schnitt im Zeitraum, darunter der Zeitraum davor. Atemfrequenz und Temperatur gelten für die Nacht davor.' })}`;
+}
+
+/** Bewegung und Trainings aus Health. */
+function bewegungKarten(k, z) {
+  const teile = [];
+  if (['schritte', 'aktivEnergie', 'tageslicht', 'achtsamkeit'].some((id) => healthHat(k, id))) {
+    teile.push(karte('var(--aktivitaet)', 'Bewegung', `
+      ${healthKacheln(k, z, ['schritte', 'aktivEnergie', 'tageslicht', 'achtsamkeit'])}
+      ${healthHat(k, 'schritte') ? `<h3 class="teil-titel">Schritte</h3>${healthLinie(k, z, 'schritte')}` : ''}`,
+    { sym: 'aktivitaet', unter: 'Schnitt pro Tag mit Werten. Tageslicht und Achtsamkeit nur an Tagen, an denen etwas gemessen wurde.' }));
+  }
+  if (healthHat(k, 'training')) {
+    const tage = healthIm(k, z.von, z.bis);
+    const trainings = tage.flatMap((d) => (d.training ?? []).map((t) => ({ ...t, tag: d.tag })));
+    const jeArt = new Map();
+    for (const t of trainings) {
+      const name = trainingsName(t.art);
+      const x = jeArt.get(name) ?? { titel: name, tage: new Set(), minuten: 0, anzahl: 0 };
+      x.tage.add(t.tag);
+      x.minuten += t.minuten;
+      x.anzahl += 1;
+      jeArt.set(name, x);
+    }
+    const zeilen = [...jeArt.values()].sort((a, b) => b.minuten - a.minuten);
+    const mitTraining = new Set(trainings.map((t) => t.tag)).size;
+    const minuten = trainings.reduce((n, t) => n + t.minuten, 0);
+    teile.push(karte('var(--aktivitaet)', 'Training', `
+      ${zeilen.length ? `${healthLinie(k, z, 'training')}${balken(zeilen.map((x) => ({ titel: x.titel, anzahl: x.minuten, text: `${x.anzahl}× · ${zahl(x.minuten, 0)} min` })))}` : '<p class="fussnote links">Keine Trainings im Zeitraum.</p>'}`,
+    { sym: 'aktivitaet', unter: `Trainings an <strong>${tagen(mitTraining)}</strong>, zusammen ${zahl(minuten / 60, 1)} h. Verlauf in Minuten pro Tag.` }));
+  }
+  return teile.join('');
+}
+
+// ---------- Ernährung ----------
+
+const NAEHRWERTE = ['kcal', 'eiweiss', 'kohlenhydrate', 'fett', 'zucker', 'ballaststoffe', 'wasser'];
+
+function ernaehrung(k, z) {
+  const essenBereich = k.bereiche.find((b) => b.id === 'ernaehrung');
+  const tage = healthIm(k, z.von, z.bis).filter((d) => d.ernaehrung);
+  const eintraege = essenBereich ? eintraegeIm(k, essenBereich.id, z.von, z.bis) : [];
+  if (!healthHat(k, 'kcal') && !eintraege.length) {
+    return leerKarte('Noch keine Ernährungsdaten. Unter Einstellungen → Apple Health den Export aus der Health-App einlesen.');
+  }
+  const farbe = farbeVon('ernaehrung');
+  const karten = [];
+
+  if (healthHat(k, 'kcal')) {
+    karten.push(karte(farbe, 'Nährwerte pro Tag', healthKacheln(k, z, NAEHRWERTE),
+      { sym: 'ernaehrung', unter: `Schnitt über die Tage mit Einträgen in der Ernährungs-App${z.vorher ? ', darunter der Zeitraum davor' : ''}.` }));
+    if (tage.length) {
+      const g = (id) => schnitt(tage.map((d) => d.ernaehrung[id] ?? 0)) ?? 0;
+      const anteile = [['eiweiss', 'Eiweiß', 4], ['kohlenhydrate', 'Kohlenhydrate', 4], ['fett', 'Fett', 9]].map(([id, titel, kcal]) => ({ titel, kcal: g(id) * kcal }));
+      const summe = anteile.reduce((n, x) => n + x.kcal, 0) || 1;
+      karten.push(karte(farbe, 'Energie', `
+        ${healthLinie(k, z, 'kcal')}
+        <h3 class="teil-titel">Woher die Energie kommt</h3>
+        ${balken(anteile.map((x) => ({ titel: x.titel, anzahl: x.kcal / summe, text: prozent(x.kcal / summe) })), { max: 1 })}`,
+      { sym: 'ernaehrung', unter: `Eingetragen an ${tagen(tage.length)}. Anteile aus Eiweiß, Kohlenhydraten und Fett, gerechnet mit 4, 4 und 9 kcal je Gramm.` }));
+    } else {
+      karten.push(karte(farbe, 'Energie', '<p class="fussnote links">Keine Einträge aus der Ernährungs-App im Zeitraum.</p>', { sym: 'ernaehrung' }));
+    }
+  }
+
+  // Mahlzeiten aus der Ernährungs-App: Uhrzeiten und häufigste Lebensmittel
+  const ausApp = eintraege.filter((e) => e.quelle === HEALTH_QUELLE);
+  if (ausApp.length) {
+    const proTag = new Map();
+    for (const e of ausApp) {
+      const t = e.zeitpunkt.slice(0, 10);
+      const zeit = e.zeitpunkt.slice(11, 16);
+      const x = proTag.get(t) ?? { erste: zeit, letzte: zeit, anzahl: 0 };
+      if (zeit < x.erste) x.erste = zeit;
+      if (zeit > x.letzte) x.letzte = zeit;
+      x.anzahl += 1;
+      proTag.set(t, x);
+    }
+    const werte = [...proTag.values()];
+    const erste = schnitt(werte.map((x) => uhrMinuten(x.erste, 4)));
+    const letzte = schnitt(werte.map((x) => uhrMinuten(x.letzte, 4)));
+    const lebensmittel = new Map();
+    for (const e of ausApp) {
+      for (const name of e.lebensmittel ?? []) {
+        const x = lebensmittel.get(name) ?? { titel: name, tage: new Set() };
+        x.tage.add(e.zeitpunkt.slice(0, 10));
+        lebensmittel.set(name, x);
+      }
+    }
+    const liste = [...lebensmittel.values()].map((x) => ({ titel: x.titel, anzahl: x.tage.size })).sort((a, b) => b.anzahl - a.anzahl || a.titel.localeCompare(b.titel, 'de'));
+    karten.push(karte(farbe, 'Mahlzeiten', `
+      <div class="info-zeilen">
+        <div><span>Erste Mahlzeit</span><strong>${uhrText(erste)}</strong></div>
+        <div><span>Letzte Mahlzeit</span><strong>${uhrText(letzte)}</strong></div>
+        <div><span>Einträge pro Tag</span><strong>${zahl(ausApp.length / proTag.size, 1)}</strong></div>
+      </div>
+      <h3 class="teil-titel">Häufigste Lebensmittel</h3>
+      ${balken(liste.slice(0, 15).map((x) => ({ ...x, text: tageText(x.anzahl) })))}
+      ${liste.length > 15 ? `<p class="fussnote links">und ${liste.length - 15} weitere</p>` : ''}`,
+    { sym: 'uhr', unter: `Schnitt über ${tageText(proTag.size)} mit Einträgen. Uhrzeit, zu der die Mahlzeit eingetragen ist.` }));
+  }
+
+  // Gruppen aus der Konfiguration, über alle Essens-Einträge (auch alte Notizen)
+  const gruppen = essensMerkmale(k);
+  const essTage = [];
+  for (let t = z.von; t <= z.bis; t = tageVerschieben(t, 1)) if (k.tage.get(t)?.bereiche.has('ernaehrung')) essTage.push(k.tage.get(t));
+  if (gruppen.length && essTage.length) {
+    const zeilen = gruppen.map((g) => ({ titel: g.titel, anzahl: essTage.filter((t) => g.hat(t)).length })).filter((x) => x.anzahl).sort((a, b) => b.anzahl - a.anzahl);
+    if (zeilen.length) {
+      karten.push(karte(farbe, 'Gruppen', balken(zeilen.map((x) => ({ ...x, text: `${x.anzahl} · ${prozent(x.anzahl / essTage.length)}` }))),
+        { sym: 'ernaehrung', unter: `Tage, an denen etwas aus der Gruppe vorkommt, von ${tagen(essTage.length)} mit Essens-Einträgen. Gesucht wird nach Wörtern, ohne Menge.` }));
+    }
+  }
+
+  if (healthHat(k, 'gewicht') && kennzahl(z.von, z.bis, healthWertAm(k, 'gewicht')).anzahl >= 2) {
+    karten.push(karte(farbe, 'Gewicht', healthLinie(k, z, 'gewicht', { abNull: false }), { sym: 'ernaehrung', unter: 'Eingetragene Werte, je Tag der letzte.' }));
+  }
+  karten.push('<p class="fussnote links">Vitamine und Mineralstoffe (etwa Kalzium) zeigt die App nicht: Die Ernährungs-App liefert sie nur für wenige Lebensmittel.</p>');
+  return karten.join('');
 }
 
 /** Karten eines Bereichs, Reihenfolge wie in der Konfiguration. */

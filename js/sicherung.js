@@ -118,7 +118,9 @@ export async function einspielen({ daten, nurKonfiguration }) {
   const meta = (daten.meta ?? []).filter((m) => m.schluessel !== 'letzteSicherung');
   // Die eingespielte Datei ist selbst eine Sicherung, ihr Zeitpunkt zählt als letzte Sicherung.
   if (daten.erstellt) meta.push({ schluessel: 'letzteSicherung', wert: daten.erstellt });
-  await allesErsetzen({ config: daten.config, eintraege: daten.eintraege, personen: daten.personen ?? [], meta });
+  // Ältere Sicherungen ohne Health-Daten lassen die vorhandenen Health-Daten stehen.
+  const health = Array.isArray(daten.health) ? daten.health : await alle(SPEICHER.health);
+  await allesErsetzen({ config: daten.config, eintraege: daten.eintraege, personen: daten.personen ?? [], meta, health });
 }
 
 // ---------- CSV-Import ----------

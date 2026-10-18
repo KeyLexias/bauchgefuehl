@@ -570,6 +570,9 @@ a.banner { text-decoration: none; }
 .daten-stand { margin: 0; font-size: 15px; color: var(--text-2); }
 .daten-stand strong { color: var(--text); }
 .fussnote code { font-size: 12px; }
+.fortschritt { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-2); }
+.fortschritt-spur { height: 8px; border-radius: 4px; background: var(--fuellung); overflow: hidden; }
+.fortschritt-spur i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--farbe); transition: width 0.2s; }
 .bericht { font-size: 14px; }
 .bericht h3 { font-family: var(--rund); font-size: 17px; margin-bottom: 6px; }
 .bericht ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
@@ -1033,6 +1036,15 @@ button.eintrag-zeile { width: 100%; text-align: left; font: inherit; background:
 .auswertung-karte .teil { display: flex; flex-direction: column; gap: 6px; }
 .auswertung-karte .teil + .teil { border-top: 1px solid var(--linie); padding-top: 12px; }
 .auswertung-karte .teil h3 { font-size: 15px; font-weight: 700; }
+.teil-titel { font-size: 15px; font-weight: 700; margin-top: 6px; }
+.auswertung-karte .kennzahl { background: var(--fuellung); box-shadow: none; min-height: 76px; }
+div.kennzahl:active { transform: none; }
+.kennzahl-unter { overflow-wrap: anywhere; }
+.info-zeilen { display: flex; flex-direction: column; font-size: 15px; }
+.info-zeilen > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.info-zeilen > div + div { border-top: 1px solid var(--linie); }
+.info-zeilen span { color: var(--text-2); }
+.info-zeilen strong { font-family: var(--rund); font-variant-numeric: tabular-nums; }
 .bericht-text {
   width: 100%; min-height: 340px; border: 0; border-radius: 12px; padding: 12px; resize: vertical;
   background: var(--fuellung); color: var(--text); font: inherit; font-size: 14px; line-height: 1.45;

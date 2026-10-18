@@ -7,9 +7,29 @@ import {
   SICHERUNG_DATEI, sicherungErstellen, csvDateienErstellen, teilen, sicherungVermerken,
   dateiPruefen, einspielen, csvImportieren,
 } from './sicherung.js';
+import { healthLesen, healthSpeichern } from './health-import.js';
 
 const fmtDatum = new Intl.DateTimeFormat('de-AT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 const zahl = new Intl.NumberFormat('de-AT');
+const fmtTag = new Intl.DateTimeFormat('de-AT', { day: 'numeric', month: 'short', year: 'numeric' });
+const tagText = (t) => (t ? fmtTag.format(new Date(`${t}T12:00`)) : '–');
+
+function healthStandText(b) {
+  if (!b) return 'Noch kein Health-Import';
+  return `Letzter Import ${fmtDatum.format(new Date(b.zeitpunkt))}${b.exportDatum ? `, Export vom ${tagText(b.exportDatum.slice(0, 10))}` : ''}`;
+}
+
+function healthBerichtHtml(b, sekunden) {
+  const zeilen = [
+    `${zahl.format(b.tage)} Tage von ${tagText(b.von)} bis ${tagText(b.bis)}`,
+    `${zahl.format(b.naechte)} Nächte mit Schlafdaten`,
+    `${zahl.format(b.ernaehrung)} Tage mit Ernährung, ${zahl.format(b.mahlzeiten)} Mahlzeiten mit Lebensmitteln`,
+    `${zahl.format(b.trainings)} Trainings`,
+  ];
+  return `<h3>Health-Import abgeschlossen</h3><ul>${zeilen.map((z) => `<li>${esc(z)}</li>`).join('')}</ul>
+    ${b.ohneErnaehrung ? '<p>Lebensmittel nicht übernommen: Der Bereich Ernährung fehlt. Zuerst die Startdatei einspielen.</p>' : ''}
+    <p>Health-Daten dieser Tage wurden ersetzt${sekunden ? `, Dauer ${zahl.format(sekunden)} s` : ''}. Zu sehen in der Auswertung.</p>`;
+}
 
 function letzteSicherungText(iso) {
   if (!iso) return 'Noch keine Sicherung';
@@ -38,8 +58,9 @@ function berichtHtml(b) {
 
 /** Zeichnet die Daten-Seite in `ziel` und hängt die Bedienung an. */
 export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '', eingebettet = false }) {
-  const [eintraege, personen, bereiche, letzte] = await Promise.all([
+  const [eintraege, personen, bereiche, letzte, healthTage, healthImport] = await Promise.all([
     anzahl(SPEICHER.eintraege), anzahl(SPEICHER.personen), alle(SPEICHER.config), metaHolen('letzteSicherung'),
+    anzahl(SPEICHER.health), metaHolen('letzterHealthImport'),
   ]);
   const eingerichtet = bereiche.length > 0;
 
@@ -82,6 +103,27 @@ export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '', einge
         ${eingerichtet ? '' : '<p class="fussnote links">Zuerst die Startdatei einspielen, dann CSV importieren.</p>'}
       </div>
       <div class="karte bericht" data-bericht hidden aria-live="polite"></div>
+    </section>
+
+    <section class="abschnitt">
+      <h2>Apple Health</h2>
+      <div class="karte daten-karte" style="--farbe: var(--ernaehrung)">
+        <p class="daten-stand"><strong>${esc(healthStandText(healthImport))}</strong><br>
+          ${zahl.format(healthTage)} Tage mit Health-Daten</p>
+        <label class="knopf" data-health-knopf>
+          ${symbol('wiederherstellen', 20)}Health-Export wählen
+          <input type="file" accept=".zip,application/zip" data-aktion="health-import" hidden>
+        </label>
+        <div class="fortschritt" data-health-fortschritt hidden>
+          <div class="fortschritt-spur"><i></i></div>
+          <span aria-live="polite">Lese …</span>
+        </div>
+        <p class="fussnote links">In der Health-App aufs Profilbild tippen, „Alle Gesundheitsdaten exportieren", die Datei
+          <code>export.zip</code> in Dateien sichern und hier wählen. Übernommen werden nur Tageswerte: Ernährung mit
+          Lebensmitteln, Schlaf, Herz- und Nachtwerte, Bewegung und Trainings. Jeder Import ersetzt die Health-Daten der
+          enthaltenen Tage.</p>
+      </div>
+      <div class="karte bericht" data-health-bericht hidden aria-live="polite"></div>
     </section>
     ${speicherHinweis}`;
 
@@ -136,6 +178,42 @@ export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '', einge
       await neuLaden();
     } catch (fehler) {
       meldung(fehler.message);
+    }
+  });
+
+  ziel.querySelector('[data-aktion="health-import"]').addEventListener('change', async (e) => {
+    const datei = e.target.files?.[0];
+    e.target.value = '';
+    if (!datei) return;
+    const knopf = ziel.querySelector('[data-health-knopf]');
+    const anzeige = ziel.querySelector('[data-health-fortschritt]');
+    const healthBericht = ziel.querySelector('[data-health-bericht]');
+    const balken = anzeige.querySelector('i');
+    const text = anzeige.querySelector('span');
+    knopf.classList.add('gesperrt');
+    anzeige.hidden = false;
+    healthBericht.hidden = true;
+    const beginn = performance.now();
+    try {
+      const gelesen = await healthLesen(datei, {
+        fortschritt: (anteil) => {
+          balken.style.width = `${Math.round(anteil * 100)}%`;
+          text.textContent = `Lese Export … ${Math.round(anteil * 100)} %`;
+        },
+      });
+      text.textContent = 'Speichere …';
+      const ergebnis = await healthSpeichern(gelesen);
+      await neuLaden();
+      const neu = ziel.querySelector('[data-health-bericht]');
+      neu.hidden = false;
+      neu.innerHTML = healthBerichtHtml(ergebnis, Math.round((performance.now() - beginn) / 1000));
+      neu.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      meldung('Health-Daten übernommen');
+    } catch (fehler) {
+      anzeige.hidden = true;
+      knopf.classList.remove('gesperrt');
+      healthBericht.hidden = false;
+      healthBericht.innerHTML = `<h3>Health-Import fehlgeschlagen</h3><p>${esc(fehler.message)}</p><p>Es wurde nichts gespeichert.</p>`;
     }
   });
 
