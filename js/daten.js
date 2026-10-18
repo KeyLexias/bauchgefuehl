@@ -65,8 +65,8 @@ export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '' }) {
           ${symbol('wiederherstellen', 20)}Datei wählen
           <input type="file" accept=".json,application/json" data-aktion="wiederherstellen" hidden>
         </label>
-        <p class="fussnote links">Eine Sicherung ersetzt alle Daten auf diesem Gerät. Eine Startdatei ersetzt nur Fragen
-          und Auswahllisten, Einträge bleiben.</p>
+        <p class="fussnote links">Eine Sicherung ersetzt alle Daten auf diesem Gerät. Eine Startdatei erneuert nur Fragen
+          und Auswahllisten, Einträge und selbst angelegte Einträge in Listen bleiben.</p>
       </div>
     </section>
 
@@ -128,7 +128,7 @@ export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '' }) {
       const geprueft = await dateiPruefen(datei);
       const { daten, nurKonfiguration } = geprueft;
       const frage = nurKonfiguration
-        ? `Startdatei mit ${daten.config.length} Bereichen einspielen? Fragen und Auswahllisten werden ersetzt, deine ${zahl.format(eintraege)} Einträge bleiben.`
+        ? `Startdatei mit ${daten.config.length} Bereichen einspielen? Fragen und Auswahllisten werden erneuert, deine ${zahl.format(eintraege)} Einträge bleiben.`
         : `Sicherung vom ${fmtDatum.format(new Date(daten.erstellt ?? Date.now()))} mit ${zahl.format(daten.eintraege.length)} Einträgen einspielen? `
           + `Alle Daten auf diesem Gerät (${zahl.format(eintraege)} Einträge) werden dadurch ersetzt.`;
       if (!confirm(frage)) return;

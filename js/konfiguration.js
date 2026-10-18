@@ -23,18 +23,20 @@
 //
 //   skala:    min, max, links, rechts (Beschriftung der Enden), darstellung 'zahlen' | 'sterne'
 //   einfach, mehrfach:
-//             optionen (Liste von Optionen), darstellung 'kacheln' | 'pillen' | 'liste' | 'farben',
+//             optionen (Liste von Optionen), darstellung 'kacheln' | 'pillen' | 'liste' | 'farben' | 'suche',
+//             'suche' zeigt ein Suchfeld; dort angelegte Einträge kommen als neue Optionen in die Konfiguration
 //             spalten (bei kacheln und farben)
 //   mehrfach: stufen optional, z. B. [{ id, titel }], dann je gewählter Option eine Stufe
 //             jeOption optional, Felder, die für jede gewählte Option gefragt werden
 //             gruppe je Option: Zwischentitel in der Liste mit Stufen
 //             exklusiv je Option: wählt alle anderen ab, z. B. „nichts"
 //             ohneJeOption je Option: jeOption-Felder entfallen für diese Option
-//   person:   zusatz optional, erscheint sobald eine Person gewählt ist (Werte flach daneben)
+//   person:   immer mit Suchfeld; zusatz optional, erscheint sobald eine Person gewählt ist (Werte flach daneben)
 //   zahl:     einheit, schritt, min, max, nachkomma
 //   dauer:    stufen [{ id, titel, minuten }] oder ohne stufen freie Eingabe in Minuten
 //   janein:   darstellung 'knoepfe' | 'schalter'
-//   tageszeit, datumzeit, text: keine weiteren Angaben
+//   text:     platzhalter optional
+//   tageszeit, datumzeit: keine weiteren Angaben
 //   farbe     optional, Bereichsname, dessen Farbe das Feld bekommt, z. B. 'genesung'
 //   kurz      optional, kurze Bezeichnung für Zusammenfassungen
 //
@@ -93,7 +95,7 @@ export function pruefen(bereich) {
     if (ids.has(f.id)) fehler.push(`Feld-Id „${f.id}" kommt doppelt vor.`);
     ids.add(f.id);
     if (!FELDTYPEN.includes(f.typ)) fehler.push(`Feld „${f.id}" hat unbekannten Typ „${f.typ}".`);
-    if ((f.typ === 'einfach' || f.typ === 'mehrfach') && !f.optionen?.length) {
+    if ((f.typ === 'einfach' || f.typ === 'mehrfach') && !f.optionen?.length && f.darstellung !== 'suche') {
       fehler.push(`Feld „${f.id}" hat keine Optionen.`);
     }
   }

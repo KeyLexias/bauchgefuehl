@@ -2,13 +2,15 @@
 import { symbol } from './symbole.js';
 import { esc, zeitpunktText, datumText, zeitpunktLesbar, tagLesbar, tagVoll, tageszeitVon } from './hilfen.js';
 import { BEREICHE, alleFelder } from './konfiguration.js';
-import { feldZeichnen, wertLesen, wertSetzen, bereinigen, feldFinden } from './felder.js';
+import { feldZeichnen, wertLesen, wertSetzen, bereinigen, feldFinden, sucheTreffer } from './felder.js';
 import { neueId } from './db.js';
 
 /**
  * Zeigt die Eingabe in `ziel` an.
  * optionen: bereich (Konfiguration), eintrag (zum Bearbeiten, optional), personen,
- *           personAnlegen(name) → Person, sichern(eintrag), abbrechen()
+ *           nutzung (Map Id → Anzahl, für die Reihenfolge der Suchtreffer),
+ *           personAnlegen(name) → Person, optionAnlegen(feld, titel) → Option,
+ *           sichern(eintrag), abbrechen()
  */
 export function formularAnzeigen(ziel, optionen) {
   const { bereich } = optionen;
@@ -30,7 +32,7 @@ export function formularAnzeigen(ziel, optionen) {
     }
   }
 
-  const ctx = () => ({ werte: zustand.werte, personen: zustand.personen, ui: zustand.ui });
+  const ctx = () => ({ werte: zustand.werte, personen: zustand.personen, ui: zustand.ui, nutzung: optionen.nutzung });
 
   const zeitAnzeige = () => {
     if (!tagesweise) return zeitpunktLesbar(zustand.zeitpunkt);
@@ -43,7 +45,7 @@ export function formularAnzeigen(ziel, optionen) {
   wurzel.style.setProperty('--farbe', `var(${art.farbe ?? '--schlaf'})`);
   wurzel.innerHTML = `
     <div class="eingabe-leiste">
-      <button type="button" class="textknopf" data-aktion="abbrechen">Abbrechen</button>
+      <button type="button" class="textknopf" data-aktion="abbrechen">${symbol('zurueck', 20)}Abbrechen</button>
       <label class="zeit-pille">
         ${symbol(tagesweise ? 'kalender' : 'uhr', 16, 2.2)}<span data-zeit>${esc(zeitAnzeige())}</span>
         <input type="${tagesweise ? 'date' : 'datetime-local'}" data-zeitpunkt
@@ -68,11 +70,19 @@ export function formularAnzeigen(ziel, optionen) {
   // Einen Feldblock (oberste Ebene) neu zeichnen, damit Zusatzfragen auf- und zuklappen.
   const neuZeichnen = (element) => {
     const block = element.closest('[data-wurzel]');
-    if (!block) return;
+    if (!block) return undefined;
     const f = (bereich.felder ?? []).find((x) => x.id === block.dataset.wurzel);
     const vorlage = document.createElement('template');
     vorlage.innerHTML = feldZeichnen(f, ctx()).trim();
-    block.replaceWith(vorlage.content.firstElementChild);
+    const neu = vorlage.content.firstElementChild;
+    block.replaceWith(neu);
+    return neu;
+  };
+
+  // Nach einer Auswahl im Suchfeld gleich weitersuchen können.
+  const sucheFokussieren = (block, pfad) => {
+    const schluessel = JSON.stringify(pfad);
+    [...(block?.querySelectorAll('[data-suche]') ?? [])].find((i) => i.dataset.suche === schluessel)?.focus();
   };
 
   const pfadVon = (el) => JSON.parse(el.dataset.pfad);
@@ -135,30 +145,31 @@ export function formularAnzeigen(ziel, optionen) {
         wertSetzen(zustand.werte, pfad, liste.includes(w) ? liste.filter((x) => x !== w) : [...liste, w]);
         break;
       }
-      case 'person-neu':
-        zustand.ui.personNeu = JSON.stringify(pfad);
-        neuZeichnen(el);
-        wurzel.querySelector('.person-neu input')?.focus();
+      case 'person-waehlen':
+        wertSetzen(zustand.werte, pfad, [...new Set([...(aktuell ?? []), w])]);
+        sucheFokussieren(neuZeichnen(el), pfad);
         return;
+      case 'person-neu': {
+        const person = await optionen.personAnlegen(el.dataset.name);
+        zustand.personen.push(person);
+        wertSetzen(zustand.werte, pfad, [...(wertLesen(zustand.werte, pfad) ?? []), person.id]);
+        sucheFokussieren(neuZeichnen(el), pfad);
+        return;
+      }
+      case 'option-waehlen':
+      case 'option-neu': {
+        const feld = feldFinden(bereich.felder, pfad[pfad.length - 1]);
+        if (!feld) return;
+        const id = aktion === 'option-neu' ? (await optionen.optionAnlegen(feld, el.dataset.name)).id : w;
+        if (feld.typ === 'mehrfach') wertSetzen(zustand.werte, [...pfad, id], {});
+        else wertSetzen(zustand.werte, pfad, id);
+        sucheFokussieren(neuZeichnen(el), pfad);
+        return;
+      }
       default:
         return;
     }
     neuZeichnen(el);
-  });
-
-  wurzel.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target.closest('[data-aktion="person-anlegen"]');
-    if (!form) return;
-    const name = form.elements.name.value.trim();
-    zustand.ui.personNeu = undefined;
-    if (name) {
-      const person = await optionen.personAnlegen(name);
-      zustand.personen.push(person);
-      const pfad = pfadVon(form);
-      wertSetzen(zustand.werte, pfad, [...(wertLesen(zustand.werte, pfad) ?? []), person.id]);
-    }
-    neuZeichnen(form);
   });
 
   wurzel.addEventListener('input', (e) => {
@@ -169,9 +180,23 @@ export function formularAnzeigen(ziel, optionen) {
       wurzel.querySelector('[data-zeit]').textContent = zeitAnzeige();
       return;
     }
-    if (!el.dataset.pfad || el.closest('form')) return;
+    if (el.matches('[data-suche]')) {
+      const pfad = JSON.parse(el.dataset.suche);
+      const feld = feldFinden(bereich.felder, pfad[pfad.length - 1]);
+      const liste = el.closest('.suche')?.querySelector('.suche-treffer');
+      if (feld && liste) liste.innerHTML = sucheTreffer(feld, el.value, ctx(), pfad);
+      return;
+    }
+    if (!el.dataset.pfad) return;
     const wert = el.type === 'number' ? (el.value === '' ? undefined : Number(el.value)) : el.value;
     wertSetzen(zustand.werte, pfadVon(el), wert);
+  });
+
+  // Eingabetaste im Suchfeld nimmt den ersten Treffer (oder legt neu an).
+  wurzel.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !e.target.matches('[data-suche]')) return;
+    e.preventDefault();
+    e.target.closest('.suche')?.querySelector('.suche-treffer .treffer')?.click();
   });
 
   // Am Mac öffnet ein Klick die Auswahl nicht von selbst.

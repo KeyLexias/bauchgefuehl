@@ -466,3 +466,34 @@ a.banner { text-decoration: none; }
 .daten-link > span:nth-child(2) { display: flex; flex-direction: column; }
 .daten-link > span:nth-child(2) span { font-size: 13px; color: var(--text-2); }
 .daten-link > svg { color: var(--text-3); }
+
+/* ---------- Suchfeld ---------- */
+.textknopf { display: inline-flex; align-items: center; gap: 2px; margin-left: -6px; }
+.suche { display: flex; flex-direction: column; gap: 8px; }
+.suche-eingabe {
+  display: flex; align-items: center; gap: 8px; min-height: var(--tippen);
+  padding: 0 14px; border-radius: 14px; background: var(--karte); color: var(--text-3);
+}
+.zusatz .suche-eingabe { background: var(--karte); }
+.suche-eingabe input {
+  flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text);
+  font: inherit; font-size: 16px; padding: 10px 0; outline: none; -webkit-appearance: none; appearance: none;
+}
+.suche-eingabe input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.suche-eingabe:focus-within { box-shadow: inset 0 0 0 2px var(--farbe); }
+.suche-treffer:empty { display: none; }
+.suche-treffer {
+  display: flex; flex-direction: column; background: var(--karte); border-radius: 14px; padding: 4px 0; overflow: hidden;
+}
+.treffer {
+  display: flex; align-items: center; gap: 10px; min-height: var(--tippen); padding: 6px 14px;
+  text-align: left; font-size: 16px; color: var(--text); border-bottom: 1px solid var(--linie);
+}
+.treffer:last-child { border-bottom: 0; }
+.treffer:active { background: var(--fuellung); }
+.treffer > svg { color: var(--farbe); flex-shrink: 0; }
+.treffer.neu { color: var(--farbe); font-weight: 600; }
+.avatar.klein { width: 28px; height: 28px; border-radius: 14px; font-size: 11px; }
+.pille.gewaehlt { padding: 0 10px 0 4px; gap: 6px; }
+.pille.gewaehlt > svg:last-child { opacity: 0.8; margin-left: 2px; }
+.pille.gewaehlt:not(:has(.avatar)) { padding-left: 12px; }

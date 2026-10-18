@@ -94,6 +94,17 @@ async function eingabe(ziel) {
     bereich,
     eintrag,
     vorgabeTag,
+    nutzung: nutzungZaehlen(await alle(SPEICHER.eintraege)),
+    // Im Suchfeld neu angelegte Einträge werden Teil der Konfiguration und damit der Sicherung.
+    optionAnlegen: async (feld, titel) => {
+      const basis = `eigen_${titel.toLocaleLowerCase('de').replace(/[^a-z0-9äöüß]+/g, '_').replace(/^_|_$/g, '') || 'eintrag'}`;
+      let id = basis;
+      for (let i = 2; (feld.optionen ?? []).some((o) => o.id === id); i += 1) id = `${basis}_${i}`;
+      const option = { id, titel: titel.trim() };
+      feld.optionen = [...(feld.optionen ?? []), option];
+      if (bereich.id !== 'beispiel') await speichern(SPEICHER.config, bereich);
+      return option;
+    },
     personen: await alle(SPEICHER.personen),
     personAnlegen: async (name) => {
       const person = { id: neueId(), name };
@@ -124,6 +135,19 @@ async function eingabe(ziel) {
       zurueck();
     },
   });
+}
+
+/** Wie oft jede Id (Person, Option) in Einträgen vorkommt, für die Reihenfolge der Suchtreffer. */
+function nutzungZaehlen(eintraege) {
+  const zaehler = new Map();
+  const zaehlen = (wert) => {
+    if (Array.isArray(wert)) wert.forEach(zaehlen);
+    else if (wert && typeof wert === 'object') {
+      for (const [k, v] of Object.entries(wert)) { zaehler.set(k, (zaehler.get(k) ?? 0) + 1); zaehlen(v); }
+    } else if (typeof wert === 'string') zaehler.set(wert, (zaehler.get(wert) ?? 0) + 1);
+  };
+  for (const e of eintraege) zaehlen(e.werte);
+  return zaehler;
 }
 
 async function eintragAmTag(bereichId, tag) {

@@ -59,7 +59,9 @@ function einfachZeichnen(f, ctx, basis) {
   const k = (o, klasse, inhalt) => knopf({ pfad, aktion: 'waehlen', wert: o.id, an: gewaehlt === o.id, klasse, inhalt });
 
   let html;
-  if (darst === 'pillen') {
+  if (darst === 'suche') {
+    html = sucheZeichnen(f, ctx, pfad);
+  } else if (darst === 'pillen') {
     html = `<div class="pillen">${optionen.map((o) => k(o, 'pille', `${optionSymbol(o, 18)}${esc(o.titel)}`)).join('')}</div>`;
   } else if (darst === 'liste') {
     const mitZeichen = optionen.some((o) => o.zeichen);
@@ -129,7 +131,9 @@ function mehrfachZeichnen(f, ctx, basis) {
       <div class="liste">${g.optionen.map(zeile).join('')}</div>`).join('');
   } else {
     const k = (o, klasse, inhalt) => knopf({ pfad: [...pfad, o.id], aktion: 'umschalten', an: !!auswahl[o.id], klasse, inhalt });
-    if (darst === 'kacheln') {
+    if (darst === 'suche') {
+      html = sucheZeichnen(f, ctx, pfad);
+    } else if (darst === 'kacheln') {
       html = raster(f.spalten ?? 4, optionen.map((o) => k(o, 'kachel gross',
         `<span class="kachel-symbol">${optionSymbol(o, 22)}</span><span>${esc(o.titel)}</span>`)).join(''));
     } else {
@@ -177,22 +181,79 @@ function tageszeitZeichnen(f, ctx, basis) {
   })).join(''));
 }
 
+// ---------- Suchfeld für Personen und lange Auswahllisten ----------
+
+const sucheNorm = (t) => String(t ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('de');
+
+/** Gewählte Ids eines Suchfelds, egal ob Person, Mehrfach- oder Einfachauswahl. */
+function sucheGewaehlt(f, wert) {
+  if (f.typ === 'person') return wert ?? [];
+  if (f.typ === 'mehrfach') return Object.keys(wert ?? {});
+  return wert ? [wert] : [];
+}
+
+function sucheKandidaten(f, ctx) {
+  if (f.typ === 'person') return ctx.personen.filter((p) => !p.ausgeblendet).map((p) => ({ id: p.id, titel: p.name, person: p }));
+  return (f.optionen ?? []).filter((o) => !o.ausgeblendet).map((o) => ({ id: o.id, titel: o.titel, option: o }));
+}
+
+function sucheMarke(k) {
+  if (k.person) return `<span class="avatar klein" style="background:${esc(k.person.farbe ?? farbeVon(k.person.name))}">${esc(initialen(k.person.name))}</span>`;
+  return optionSymbol(k.option, 18);
+}
+
+/** Trefferliste zum eingegebenen Text: beste Treffer zuerst, häufig Genutztes vor Seltenem. */
+export function sucheTreffer(f, text, ctx, pfad) {
+  const q = sucheNorm(text);
+  if (!q) return '';
+  const gewaehlt = sucheGewaehlt(f, wertLesen(ctx.werte, pfad));
+  const kandidaten = sucheKandidaten(f, ctx);
+  const nutzung = (id) => ctx.nutzung?.get(id) ?? 0;
+  const treffer = kandidaten
+    .filter((k) => !gewaehlt.includes(k.id) && sucheNorm(k.titel).includes(q))
+    .sort((a, b) => Number(sucheNorm(b.titel).startsWith(q)) - Number(sucheNorm(a.titel).startsWith(q))
+      || nutzung(b.id) - nutzung(a.id) || a.titel.localeCompare(b.titel, 'de'))
+    .slice(0, 8);
+  const gibtEs = kandidaten.some((k) => sucheNorm(k.titel) === q);
+  const art = f.typ === 'person' ? 'person' : 'option';
+  const zeilen = treffer.map((k) => `<button type="button" class="treffer" data-aktion="${art}-waehlen" data-wert="${esc(k.id)}" ${pfadAttr(pfad)}>
+      ${sucheMarke(k)}<span>${esc(k.titel)}</span></button>`).join('');
+  const neu = gibtEs ? '' : `<button type="button" class="treffer neu" data-aktion="${art}-neu" data-name="${esc(String(text).trim())}" ${pfadAttr(pfad)}>
+      ${symbol('plus', 18)}<span>„${esc(String(text).trim())}" hinzufügen</span></button>`;
+  return zeilen + neu;
+}
+
+/** Gewählte Einträge als Pillen mit ×, darunter ein Suchfeld. */
+function sucheZeichnen(f, ctx, pfad) {
+  const gewaehlt = sucheGewaehlt(f, wertLesen(ctx.werte, pfad));
+  const alleKandidaten = f.typ === 'person'
+    ? ctx.personen.map((p) => ({ id: p.id, titel: p.name, person: p }))
+    : (f.optionen ?? []).map((o) => ({ id: o.id, titel: o.titel, option: o }));
+  const pillen = gewaehlt.map((id) => {
+    const k = alleKandidaten.find((x) => x.id === id) ?? { id, titel: id, option: {} };
+    const aktion = f.typ === 'person' ? 'person' : f.typ === 'mehrfach' ? 'umschalten' : 'waehlen';
+    const kpfad = f.typ === 'mehrfach' ? [...pfad, id] : pfad;
+    return knopf({
+      pfad: kpfad, aktion, wert: f.typ === 'mehrfach' ? undefined : id, an: true, klasse: 'pille gewaehlt',
+      inhalt: `${sucheMarke(k)}${esc(k.titel)}${symbol('schliessen', 14, 2.4)}`, label: `${k.titel} entfernen`,
+    });
+  }).join('');
+  const platzhalter = f.platzhalter ?? (f.typ === 'person' ? 'Name suchen oder neu eingeben' : 'Suchen oder neu eingeben');
+  const einzelnVoll = f.typ === 'einfach' && gewaehlt.length > 0;
+  return `<div class="suche">
+      ${pillen ? `<div class="pillen">${pillen}</div>` : ''}
+      ${einzelnVoll ? '' : `<label class="suche-eingabe">${symbol('suche', 18)}
+        <input type="search" data-suche="${esc(JSON.stringify(pfad))}" placeholder="${esc(platzhalter)}"
+          autocomplete="off" autocorrect="off" autocapitalize="words" enterkeyhint="done" aria-label="${esc(f.titel)}: ${esc(platzhalter)}">
+      </label>
+      <div class="suche-treffer" role="listbox"></div>`}
+    </div>`;
+}
+
 function personZeichnen(f, ctx, basis) {
   const pfad = [...basis, f.id];
   const gewaehlt = wertLesen(ctx.werte, pfad) ?? [];
-  const schluessel = JSON.stringify(pfad);
-  const personen = ctx.personen.filter((p) => !p.ausgeblendet || gewaehlt.includes(p.id));
-  const knoepfe = personen.map((p) => knopf({
-    pfad, aktion: 'person', wert: p.id, an: gewaehlt.includes(p.id), klasse: 'pille person',
-    inhalt: `<span class="avatar" style="background:${esc(p.farbe ?? farbeVon(p.name))}">${esc(initialen(p.name))}</span>${esc(p.name)}`,
-  })).join('');
-  const neu = ctx.ui.personNeu === schluessel
-    ? `<form class="person-neu" data-aktion="person-anlegen" ${pfadAttr(pfad)}>
-         <input name="name" type="text" placeholder="Name" autocomplete="off" enterkeyhint="done" aria-label="Name der Person">
-         <button type="submit" class="wahl pille">Hinzufügen</button>
-       </form>`
-    : `<button type="button" class="wahl pille zart" data-aktion="person-neu" ${pfadAttr(pfad)}>${symbol('plus', 18)}Person</button>`;
-  let html = `<div class="pillen">${knoepfe}${neu}</div>`;
+  let html = sucheZeichnen(f, ctx, pfad);
   // Zusatzfragen erscheinen, sobald mindestens eine Person gewählt ist.
   if (gewaehlt.length && sichtbar(f.zusatz).length) {
     html += `<div class="zusatz">${sichtbar(f.zusatz).map((z) => feldZeichnen(z, ctx, basis, true)).join('')}</div>`;

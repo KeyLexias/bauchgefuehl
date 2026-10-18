@@ -1,6 +1,7 @@
 // Sicherung als JSON, Wiederherstellen, Teilen-Dialog und CSV-Import.
 import { allesLesen, allesErsetzen, alle, metaSetzen, vieleSpeichern, SPEICHER } from './db.js';
-import { pruefen, BEREICHE } from './konfiguration.js';
+import { pruefen, BEREICHE, alleFelder } from './konfiguration.js';
+import { feldFinden } from './felder.js';
 import { bereichAlsCsv, bereichFuerDatei, eintragAlsZeile, importKontext, zeileLesen } from './csv.js';
 import { neueId } from './db.js';
 
@@ -77,11 +78,32 @@ export async function dateiPruefen(datei) {
   return { daten, nurKonfiguration };
 }
 
-/** Spielt eine geprüfte Datei ein. Sicherung: alles ersetzen. Startdatei: nur Konfiguration ersetzen. */
+/**
+ * Neue Konfiguration übernehmen, ohne Optionen zu verlieren, die nur in der bisherigen stehen
+ * (aus dem CSV-Import oder im Suchfeld angelegt). Bereiche, die in der neuen fehlen, bleiben.
+ */
+export function konfigurationZusammenfuehren(alt, neu) {
+  const ergebnis = neu.map((b) => {
+    const vorher = alt.find((x) => x.id === b.id);
+    if (!vorher) return b;
+    const kopie = structuredClone(b);
+    for (const f of alleFelder(kopie.felder)) {
+      const altFeld = feldFinden(vorher.felder, f.id);
+      if (!altFeld?.optionen?.length) continue;
+      const ids = new Set((f.optionen ?? []).map((o) => o.id));
+      const fehlend = altFeld.optionen.filter((o) => !ids.has(o.id));
+      if (fehlend.length) f.optionen = [...(f.optionen ?? []), ...fehlend];
+    }
+    return kopie;
+  });
+  return [...ergebnis, ...alt.filter((a) => !neu.some((b) => b.id === a.id))];
+}
+
+/** Spielt eine geprüfte Datei ein. Sicherung: alles ersetzen. Startdatei: nur Konfiguration erneuern. */
 export async function einspielen({ daten, nurKonfiguration }) {
   if (nurKonfiguration) {
     const jetzt = await allesLesen();
-    await allesErsetzen({ ...jetzt, config: daten.config });
+    await allesErsetzen({ ...jetzt, config: konfigurationZusammenfuehren(jetzt.config, daten.config) });
     return;
   }
   const meta = (daten.meta ?? []).filter((m) => m.schluessel !== 'letzteSicherung');
