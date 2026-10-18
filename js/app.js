@@ -1,5 +1,8 @@
 import { symbol } from './symbole.js';
-import { alle, SPEICHER, dauerhaftAnfragen } from './db.js';
+import { alle, holen, speichern, loeschen, SPEICHER, dauerhaftAnfragen, neueId } from './db.js';
+import { BEISPIEL, BEREICHE } from './konfiguration.js';
+import { formularAnzeigen } from './formular.js';
+import { esc } from './hilfen.js';
 
 const TABS = [
   { pfad: 'uebersicht', titel: 'Übersicht', symbol: 'uebersicht' },
@@ -13,10 +16,25 @@ const tabs = document.getElementById('tabs');
 const datumLang = new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'long' });
 
 let dauerhaft = null;
+let updateWartet = false;
+
+function adresse() {
+  return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+}
 
 function aktuellerPfad() {
-  const pfad = location.hash.replace(/^#\/?/, '');
-  return TABS.some((t) => t.pfad === pfad) ? pfad : 'uebersicht';
+  const [pfad] = adresse();
+  return TABS.some((t) => t.pfad === pfad) || pfad === 'eintrag' ? pfad : 'uebersicht';
+}
+
+/** Kurze Meldung unten am Bildschirm. */
+export function meldung(text) {
+  const el = document.createElement('div');
+  el.className = 'meldung';
+  el.setAttribute('role', 'status');
+  el.textContent = text;
+  document.body.append(el);
+  setTimeout(() => el.remove(), 2600);
 }
 
 function tabsZeichnen(aktiv) {
@@ -53,6 +71,7 @@ async function uebersicht() {
         <p>Spiel deine Startdatei oder eine Sicherung ein, dann erscheinen hier deine Bereiche.</p>
         <button class="knopf haupt" type="button" disabled>Wiederherstellen</button>
         <p class="fussnote">Wiederherstellen folgt im nächsten Ausbauschritt.</p>
+        <a class="knopf" href="#/eintrag/beispiel">Beispiel-Eingabe ansehen</a>
       </section>
       ${speicherHinweis()}`;
   }
@@ -69,6 +88,55 @@ function spaeter(titel, farbe, sym) {
     </section>`;
 }
 
+/** Eingabe für einen Bereich, neu oder zum Bearbeiten (#/eintrag/bereich/id). */
+async function eingabe(ziel) {
+  const [, bereichId, eintragId] = adresse();
+  const bereich = bereichId === 'beispiel' ? BEISPIEL : await holen(SPEICHER.config, bereichId);
+  if (!bereich || !BEREICHE[bereichId]) {
+    ziel.innerHTML = `<section class="karte leer"><h2>Bereich nicht gefunden</h2>
+      <p>„${esc(bereichId)}" ist nicht eingerichtet.</p><a class="knopf" href="#/uebersicht">Zur Übersicht</a></section>`;
+    return;
+  }
+  const eintrag = eintragId ? await holen(SPEICHER.eintraege, eintragId) : undefined;
+  const zurueck = () => { location.hash = '#/uebersicht'; };
+  formularAnzeigen(ziel, {
+    bereich,
+    eintrag,
+    personen: await alle(SPEICHER.personen),
+    personAnlegen: async (name) => {
+      const person = { id: neueId(), name };
+      if (bereich.id !== 'beispiel') await speichern(SPEICHER.personen, person);
+      return person;
+    },
+    abbrechen: zurueck,
+    sichern: async (neu) => {
+      if (bereich.id === 'beispiel') {
+        beispielErgebnis(ziel, neu);
+        return;
+      }
+      await speichern(SPEICHER.eintraege, neu);
+      meldung('Gesichert');
+      zurueck();
+    },
+    loeschen: async (alt) => {
+      if (!confirm('Diesen Eintrag löschen?')) return;
+      await loeschen(SPEICHER.eintraege, alt.id);
+      meldung('Gelöscht');
+      zurueck();
+    },
+  });
+}
+
+// Das Beispiel speichert nichts, es zeigt nur, was gespeichert würde.
+function beispielErgebnis(ziel, eintrag) {
+  ziel.querySelector('.beispiel-ergebnis')?.remove();
+  const karte = document.createElement('section');
+  karte.className = 'karte beispiel-ergebnis';
+  karte.innerHTML = `<h2>So würde der Eintrag gespeichert</h2><pre>${esc(JSON.stringify(eintrag, null, 2))}</pre>`;
+  ziel.querySelector('.eingabe').append(karte);
+  karte.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 const ANSICHTEN = {
   uebersicht,
   genesung: () => spaeter('Genesung', '--genesung', 'genesung'),
@@ -77,9 +145,13 @@ const ANSICHTEN = {
 
 async function zeichnen() {
   const pfad = aktuellerPfad();
+  const istEingabe = pfad === 'eintrag';
+  if (updateWartet && !istEingabe) { location.reload(); return; }
+  document.body.classList.toggle('ohne-tabs', istEingabe);
   tabsZeichnen(pfad);
   try {
-    ansicht.innerHTML = await ANSICHTEN[pfad]();
+    if (istEingabe) await eingabe(ansicht);
+    else ansicht.innerHTML = await ANSICHTEN[pfad]();
   } catch (fehler) {
     console.error(fehler);
     ansicht.innerHTML = `
@@ -93,12 +165,20 @@ async function zeichnen() {
 
 function serviceWorkerStarten() {
   if (!('serviceWorker' in navigator)) return;
-  // Nur neu laden, wenn eine neue Version eine bereits laufende ablöst.
+  // Nur neu laden, wenn eine neue Version eine bereits laufende ablöst,
+  // und nie mitten in einer Eingabe, sonst ginge sie verloren.
   const hatteSteuerung = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (hatteSteuerung) location.reload();
+    if (!hatteSteuerung) return;
+    if (aktuellerPfad() === 'eintrag') updateWartet = true;
+    else location.reload();
   });
-  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch((fehler) => {
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+    // Am iPhone bleibt die App oft im Hintergrund offen: beim Zurückholen nach Updates sehen.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
+  }).catch((fehler) => {
     console.warn('Offline-Modus nicht verfügbar:', fehler);
   });
 }

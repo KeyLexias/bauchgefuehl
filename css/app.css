@@ -161,3 +161,194 @@ h1, h2, h3 { font-family: var(--rund); margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---------- Eingabe ---------- */
+body.ohne-tabs .tabs { display: none; }
+body.ohne-tabs .ansicht { padding-bottom: calc(24px + var(--abstand-unten)); }
+
+.eingabe {
+  --voll: var(--farbe);
+  --zart: color-mix(in srgb, var(--farbe) 12%, var(--karte));
+  display: flex; flex-direction: column; gap: 18px;
+}
+@media (prefers-color-scheme: dark) {
+  .eingabe { --voll: color-mix(in srgb, var(--farbe) 62%, #000000); --zart: color-mix(in srgb, var(--farbe) 16%, var(--karte)); }
+}
+
+.eingabe-leiste {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: var(--tippen); margin-top: -8px;
+}
+.textknopf { color: var(--farbe); font-size: 17px; min-height: var(--tippen); padding: 0 4px 0 0; }
+
+.zeit-pille {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 0 12px; border-radius: 18px;
+  background: var(--karte); color: var(--farbe); font-size: 15px; font-weight: 600;
+}
+.zeit-pille input {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: 0; padding: 0; margin: 0; cursor: pointer;
+  -webkit-appearance: none; appearance: none; font-size: 16px;
+}
+
+.eingabe-kopf { display: flex; align-items: center; gap: 12px; }
+.eingabe-kopf h1 { font-size: 28px; font-weight: 700; line-height: 1.15; }
+.eingabe-kopf p { margin: 2px 0 0; font-size: 13px; color: var(--text-2); }
+.symbol-voll {
+  flex-shrink: 0; width: 48px; height: 48px; border-radius: 15px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--voll); color: #FFFFFF;
+}
+
+.eingabe-felder { display: flex; flex-direction: column; gap: 20px; }
+
+.feld { display: flex; flex-direction: column; gap: 8px; }
+.feld-titel {
+  font-family: inherit; font-size: 13px; font-weight: 700; color: var(--farbe);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.feld-titel .optional { color: var(--text-3); font-weight: 600; }
+.feld-hilfe { margin: 0; font-size: 13px; color: var(--text-2); }
+.feld.verschachtelt { gap: 6px; }
+.feld.verschachtelt .feld-titel { text-transform: none; letter-spacing: 0; font-size: 13px; }
+
+/* Auswahlknöpfe: Grund ist die Karte, gewählt in der Bereichsfarbe */
+.wahl {
+  min-height: var(--tippen); border-radius: 14px;
+  background: var(--karte); color: var(--text);
+  font-size: 15px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background-color 0.12s, color 0.12s;
+  touch-action: manipulation;
+}
+.wahl[aria-pressed="true"] { background: var(--voll); color: #FFFFFF; }
+.wahl:active { transform: scale(0.97); }
+
+.raster { display: grid; grid-template-columns: repeat(var(--spalten, 3), minmax(0, 1fr)); gap: 8px; }
+
+.kachel { min-height: 56px; flex-direction: column; gap: 4px; padding: 6px 4px; font-size: 14px; text-align: center; line-height: 1.15; }
+.kachel.klein { min-height: 62px; font-size: 11.5px; padding: 4px 2px; }
+.kachel.gross { min-height: 76px; font-size: 12px; border-radius: 16px; }
+.kachel-symbol {
+  width: 34px; height: 34px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--farbe) 14%, transparent); color: var(--farbe);
+}
+.kachel.gross[aria-pressed="true"] .kachel-symbol { background: rgba(255, 255, 255, 0.22); color: #FFFFFF; }
+
+.pillen { display: flex; flex-wrap: wrap; gap: 8px; }
+.pille { border-radius: 22px; padding: 0 14px 0 10px; }
+.pille.zart { background: var(--zart); color: var(--farbe); }
+.pille.person { padding-left: 4px; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 17px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-size: 12px; font-weight: 700;
+}
+
+.liste { background: var(--karte); border-radius: var(--radius); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.zeile {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px;
+  justify-content: stretch; text-align: left; min-height: 50px; padding: 4px 10px; border-radius: 13px;
+  background: transparent;
+}
+.zeile .zeile-bild { display: flex; align-items: center; justify-content: center; color: var(--farbe); }
+.zeile[aria-pressed="true"] .zeile-bild { color: #FFFFFF; }
+.zeile .form { width: 52px; height: 30px; }
+.etikett {
+  font-size: 12px; font-weight: 700; border-radius: 9px; padding: 3px 8px;
+  background: var(--fuellung); color: var(--text-2);
+}
+.zeile[aria-pressed="true"] .etikett { background: rgba(255, 255, 255, 0.22); color: #FFFFFF; }
+
+.farbe { justify-content: flex-start; padding: 0 10px; font-size: 14px; }
+.farbe[aria-pressed="true"] { background: var(--karte); color: var(--text); box-shadow: inset 0 0 0 2.5px var(--farbe); }
+.tupfer { width: 20px; height: 20px; border-radius: 10px; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.35); }
+
+/* Zeilen mit Stärke-Stufen */
+.stufen-zeile {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) minmax(0, 186px); gap: 8px; align-items: center;
+  padding: 4px 6px;
+}
+.zeile-symbol {
+  width: 32px; height: 32px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--farbe) 14%, transparent); color: var(--farbe);
+}
+.stufen-zeile .zeile-titel { font-size: 15px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.stufen { display: grid; grid-template-columns: repeat(var(--spalten, 3), minmax(0, 1fr)); gap: 4px; }
+.stufe { border-radius: 11px; font-size: 13px; padding: 0 2px; }
+.liste .stufe:not([aria-pressed="true"]),
+.zusatz .wahl:not([aria-pressed="true"]) { background: var(--fuellung); }
+
+/* Aufklappende Zusatzfragen */
+.zusatz {
+  background: var(--zart); border-radius: 14px; padding: 10px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.liste .zusatz { margin: 0 6px 6px; }
+.zusatz .wahl:not([aria-pressed="true"]) { background: var(--karte); }
+.zusatz-kopf { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--text); }
+.zusatz-kopf > svg { color: var(--farbe); flex-shrink: 0; }
+.zusatz-kopf .schalter { margin-left: auto; }
+.schalter { min-height: 36px; border-radius: 18px; padding: 0 12px; font-size: 13px; gap: 4px; }
+
+/* Skalen */
+.sterne { display: flex; gap: 6px; }
+.stern { flex: 1; min-height: 52px; background: var(--karte); color: var(--text-3); }
+.stern[aria-pressed="true"] { background: var(--karte); color: var(--farbe); }
+.stern[aria-pressed="true"] svg { fill: currentColor; }
+.zahl { font-family: var(--rund); font-size: 20px; font-weight: 700; min-height: 52px; }
+.enden { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-2); }
+
+/* Zahl mit Einheit */
+.zahl-eingabe { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 8px; align-items: center; }
+.schritt { min-height: 52px; color: var(--farbe); font-size: 17px; font-weight: 700; }
+.zahl-feld {
+  display: flex; align-items: baseline; justify-content: center; gap: 4px;
+  background: var(--karte); border-radius: 14px; min-height: 52px; padding: 0 10px;
+}
+.zahl-feld input {
+  width: 100%; min-width: 0; border: 0; background: transparent; color: var(--text);
+  font-family: var(--rund); font-size: 28px; font-weight: 700; text-align: center;
+  font-variant-numeric: tabular-nums; padding: 8px 0; -moz-appearance: textfield;
+}
+.zahl-feld input::-webkit-outer-spin-button,
+.zahl-feld input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.zahl-feld span { color: var(--text-2); font-size: 15px; }
+
+.eingabe-feld {
+  width: 100%; border: 0; border-radius: 14px; padding: 12px 14px;
+  background: var(--karte); color: var(--text);
+  font: inherit; font-size: 16px; min-height: var(--tippen);
+}
+textarea.eingabe-feld { resize: vertical; min-height: 88px; }
+
+.person-neu { display: flex; gap: 6px; flex: 1 1 100%; }
+.person-neu input {
+  flex: 1; min-width: 0; min-height: var(--tippen); border: 0; border-radius: 22px; padding: 0 14px;
+  background: var(--karte); color: var(--text); font: inherit; font-size: 16px;
+  box-shadow: inset 0 0 0 2px var(--farbe);
+}
+
+.hinweis {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; align-items: start;
+  padding: 10px 12px; border-radius: 14px; font-size: 14px;
+  background: color-mix(in srgb, #DC2626 12%, var(--karte)); color: var(--text);
+}
+.hinweis svg { color: #DC2626; margin-top: 1px; }
+
+.sichern-leiste { display: flex; gap: 10px; margin-top: 4px; }
+.sichern-leiste .knopf { flex: 1; }
+.knopf.gefahr { flex: 0 0 auto; color: #DC2626; background: var(--karte); }
+
+.beispiel-ergebnis h2 { font-size: 17px; margin-bottom: 8px; }
+.beispiel-ergebnis pre { margin: 0; font-size: 12px; white-space: pre-wrap; word-break: break-word; color: var(--text-2); }
+
+/* Kurze Meldung */
+.meldung {
+  position: fixed; left: 50%; bottom: calc(100px + var(--abstand-unten)); transform: translateX(-50%);
+  background: rgba(28, 28, 30, 0.92); color: #FFFFFF; padding: 10px 18px; border-radius: 20px;
+  font-size: 15px; font-weight: 600; z-index: 20; pointer-events: none;
+}
