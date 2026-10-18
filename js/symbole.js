@@ -31,6 +31,7 @@ export const SYMBOLE = {
   'sonne-unter': 'M5 18a7 7 0 0 1 14 0M2 18h20M12 8V4M9 6l3 3 3-3',
   kalender: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
   minus: 'M5 12h14',
+  wiederholen: 'M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4',
   schliessen: 'M6 6l12 12M18 6L6 18',
   kontakt: 'M12 8a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6.5 19c1-2.5 3-3.5 5.5-3.5s4.5 1 5.5 3.5M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z',
   feuer: 'M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z',

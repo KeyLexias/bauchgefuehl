@@ -4,6 +4,7 @@ import { pruefen, BEREICHE, alleFelder } from './konfiguration.js';
 import { feldFinden } from './felder.js';
 import { bereichAlsCsv, bereichFuerDatei, eintragAlsZeile, importKontext, zeileLesen } from './csv.js';
 import { neueId } from './db.js';
+import { GENESUNG, GENESUNG_CSV, genesungAlsCsv, genesungZusammenfuehren } from './genesung-daten.js';
 
 export const SICHERUNG_DATEI = 'bauchgefuehl-backup.json';
 const APP = 'bauchgefuehl';
@@ -20,9 +21,13 @@ export async function sicherungErstellen() {
 /** CSV-Dateien aller Bereiche mit CSV-Zuordnung. */
 export async function csvDateienErstellen() {
   const { config, eintraege, personen } = await allesLesen();
-  return config
+  const dateien = config
     .filter((b) => b.csv?.datei && BEREICHE[b.id])
     .map((b) => new File([bereichAlsCsv(b, eintraege, personen)], b.csv.datei, { type: 'text/csv' }));
+  const genesung = config.find((b) => b.id === GENESUNG);
+  const text = genesung ? genesungAlsCsv(genesung, config, eintraege) : '';
+  if (text) dateien.push(new File([text], GENESUNG_CSV, { type: 'text/csv' }));
+  return dateien;
 }
 
 /**
@@ -87,6 +92,7 @@ export function konfigurationZusammenfuehren(alt, neu) {
   const ergebnis = neu.map((b) => {
     const vorher = alt.find((x) => x.id === b.id);
     if (!vorher) return b;
+    if (b.id === GENESUNG) return genesungZusammenfuehren(vorher, b);
     const kopie = structuredClone(b);
     for (const f of alleFelder(kopie.felder)) {
       const altFeld = feldFinden(vorher.felder, f.id);

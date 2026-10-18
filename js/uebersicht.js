@@ -4,6 +4,8 @@ import { alle, anzahl, eintraegeZwischen, metaHolen, SPEICHER } from './db.js';
 import { BEREICHE } from './konfiguration.js';
 import { esc, datumText, tageVerschieben, alsDatum } from './hilfen.js';
 import { zusammenfassen } from './zusammenfassung.js';
+import { uebungenFuerTag } from './genesung.js';
+import { genesungKontext } from './genesung-daten.js';
 
 const datumLang = new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'long' });
 const fmtUhr = new Intl.DateTimeFormat('de-AT', { hour: '2-digit', minute: '2-digit' });
@@ -149,6 +151,7 @@ export async function uebersicht(tag, speicherHinweis = '') {
     ${await wochenleiste(tag)}
     ${await sicherungsBanner()}
     ${kacheln || karten ? `<div class="tageskarten">${kacheln}${karten}</div>` : ''}
+    ${uebungenFuerTag(tag, await genesungKontext())}
     <section class="abschnitt">
       <h2>Einträge</h2>
       ${liste ? `<div class="karte eintraege">${liste}</div>` : '<p class="fussnote links">An diesem Tag noch nichts eingetragen.</p>'}

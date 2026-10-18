@@ -709,3 +709,196 @@ a.banner { text-decoration: none; }
 .kopf .datum-link { color: var(--akzent); }
 .ansicht > .knopf { background: var(--karte); }
 [data-daten] { display: contents; }
+
+/* ---------- Genesung ---------- */
+.rund-knopf.voll { background: color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000); color: #FFFFFF; }
+.kopf-unter { margin: 0; color: var(--text-2); font-size: 15px; }
+.symbol-voll.gross { width: 46px; height: 46px; border-radius: 14px; }
+.symbol-klein.grau { background: var(--fuellung); color: var(--text-2); }
+
+.beschwerde { display: flex; flex-direction: column; gap: 16px; border-radius: 22px; box-shadow: var(--karte-schatten); }
+.beschwerde-kopf { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; color: var(--text); }
+.beschwerde-titel { display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.beschwerde-titel strong { font-family: var(--rund); font-size: 20px; }
+.beschwerde-kompakt .beschwerde-titel strong { font-family: inherit; font-size: 17px; font-weight: 600; }
+.beschwerde-titel span { font-size: 13px; color: var(--text-2); }
+.status-marke {
+  font-size: 12px; font-weight: 700; border-radius: 10px; padding: 4px 9px; white-space: nowrap;
+  background: color-mix(in srgb, var(--genesung) 14%, transparent); color: var(--genesung);
+}
+.status-marke.pausiert, .status-marke.geheilt { background: var(--fuellung); color: var(--text-2); }
+
+.beschwerde-teil { display: flex; flex-direction: column; gap: 6px; }
+.beschwerde-teil h3, .teil-kopf h2 { font-family: inherit; font-size: 15px; font-weight: 600; }
+.teil-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.teil-kopf .vergleich, .offen-zahl { font-size: 13px; font-weight: 600; color: var(--text-2); text-align: right; }
+.vergleich.ton-gut { color: var(--ton-gut); }
+.vergleich.ton-schlecht { color: var(--ton-schlecht); }
+.offen-zahl { color: var(--magen); }
+.abschnitt > .teil-kopf h2 { font-family: var(--rund); font-size: 20px; font-weight: 700; }
+
+.schmerz-balken {
+  display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; align-items: end;
+  height: 76px; border-bottom: 1px solid var(--linie);
+}
+.schmerz-balken span { border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--genesung) 42%, var(--karte)); }
+.schmerz-balken span.heute { background: var(--genesung); }
+.schmerz-balken span.termin { background: color-mix(in srgb, var(--genesung) 75%, #000000); }
+.schmerz-balken span.ohne { background: var(--rand); }
+.balken-achse { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-2); }
+.balken-achse span { display: inline-flex; align-items: center; gap: 4px; }
+.termin-punkt { width: 8px; height: 8px; border-radius: 2px; background: color-mix(in srgb, var(--genesung) 75%, #000000); }
+
+.ue-zeile {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  min-height: 52px; padding: 4px 0; color: var(--text);
+  transition: transform 0.25s var(--feder);
+}
+.ue-zeile:active { transform: scale(0.985); }
+.ue-text { display: flex; flex-direction: column; min-width: 0; }
+.ue-text strong { font-size: 15px; }
+.ue-text span { font-size: 12px; color: var(--text-2); }
+.ue-tage { display: flex; gap: 3px; }
+.ue-tage i { width: 9px; height: 18px; border-radius: 3px; background: var(--rand); }
+.ue-tage i.halb { background: color-mix(in srgb, var(--uebung) 40%, var(--karte)); }
+.ue-tage i.an { background: var(--uebung); }
+.textlink.klein { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 8px 0; font-size: 14px; min-height: var(--tippen); }
+.textlink.mitte { align-self: center; text-align: center; }
+
+.anordnung {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: start;
+  padding: 10px 12px; border-radius: 14px; color: var(--text);
+  background: color-mix(in srgb, var(--genesung) 8%, var(--karte));
+}
+.anordnung > svg { color: var(--genesung); margin-top: 2px; }
+.anordnung > span { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.anordnung strong { font-size: 14px; }
+.anordnung .naechster { color: var(--text-2); font-size: 13px; }
+.beschwerde-knoepfe { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.beschwerde-knoepfe .knopf { min-height: var(--tippen); font-size: 14px; padding: 0 8px; border-radius: 12px; }
+.knopf.zart { background: color-mix(in srgb, var(--farbe) 14%, var(--karte)); color: color-mix(in srgb, var(--farbe) 80%, var(--text)); }
+.beschwerde > .textlink.mitte { margin: -10px 0 -8px; }
+
+.beschwerde-kompakt {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  width: 100%; padding: 14px 16px; text-align: left;
+}
+.geheilt summary {
+  list-style: none; display: flex; align-items: center; gap: 8px; min-height: var(--tippen);
+  padding: 0 4px; font-size: 16px; font-weight: 600; cursor: pointer;
+}
+.geheilt summary::-webkit-details-marker { display: none; }
+.geheilt summary > svg { color: var(--uebung); }
+.geheilt summary .anzeigen { margin-left: auto; color: var(--text-3); font-size: 14px; font-weight: 500; }
+.geheilt summary .anzeigen::after { content: "Anzeigen"; }
+.geheilt[open] summary .anzeigen::after { content: "Ausblenden"; }
+.geheilt-zeile { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; }
+.geheilt-zeile a { display: flex; flex-direction: column; min-width: 0; color: var(--text); }
+.geheilt-zeile a span { font-size: 13px; color: var(--text-2); }
+.geheilt-zeile .textknopf { --farbe: var(--genesung); font-size: 15px; font-weight: 600; margin: 0; }
+
+.status-wahl { display: flex; flex-direction: column; gap: 8px; }
+.status-option {
+  flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; text-align: left;
+  background: var(--fuellung); min-height: 64px;
+}
+.status-option strong { font-size: 16px; }
+.status-option span { font-size: 13px; font-weight: 400; color: var(--text-2); }
+.status-option[aria-pressed="true"] span { color: rgba(255, 255, 255, 0.85); }
+
+/* Übungsseite */
+.seiten-leiste { display: flex; align-items: center; justify-content: space-between; margin: -12px 0 -10px; }
+.seiten-leiste .zurueck-link { margin: 0 0 0 -6px; }
+.seiten-leiste .textknopf { color: var(--farbe); font-size: 16px; font-weight: 600; margin: 0; display: inline-flex; align-items: center; }
+.hinweis-zart { margin: 0; padding: 10px 12px; border-radius: 14px; background: var(--fuellung); color: var(--text-2); font-size: 14px; }
+.ue-karte { border-radius: 22px; box-shadow: var(--karte-schatten); }
+.ue-eingabe {
+  --voll: color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.ue-eingabe .zeit-pille { align-self: center; background: var(--fuellung); color: var(--text); }
+.ue-zahl { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 8px; align-items: center; }
+.ue-zahl .schritt { min-height: 60px; border-radius: 18px; background: var(--fuellung); font-size: 18px; }
+.ue-wert { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.ue-wert input {
+  width: 100%; border: 0; background: transparent; color: var(--text); text-align: center; padding: 0;
+  font-family: var(--rund); font-size: 60px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums;
+}
+.ue-wert input:focus { outline: none; color: var(--farbe); }
+.ue-einheit { font-size: 11px; color: var(--text-3); }
+.ue-hinweis { font-size: 13px; font-weight: 600; color: var(--text-2); min-height: 18px; margin-top: 2px; }
+.ue-hinweis.ton-gut { color: var(--ton-gut); }
+.ue-abhaken { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 4px 0; }
+.ue-haken {
+  width: 76px; height: 76px; border-radius: 38px; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--farbe) 14%, transparent); color: var(--farbe);
+}
+.ue-stand { margin: -6px 0 0; text-align: center; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.ue-stand:empty { display: none; }
+.ue-eingabe .sichern-leiste { margin-top: 0; }
+.ue-woche { display: flex; flex-direction: column; gap: 10px; }
+.ue-woche .teil-kopf h2 { font-family: var(--rund); font-size: 17px; font-weight: 700; }
+.woche-diagramm { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: end; height: 100px; }
+.woche-balken { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+.woche-balken span { font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.woche-balken i { width: 100%; border-radius: 5px; background: var(--rand); }
+.woche-balken i.an { background: color-mix(in srgb, var(--uebung) 45%, var(--karte)); }
+.woche-balken i.halb { background: color-mix(in srgb, var(--uebung) 25%, var(--karte)); }
+.woche-balken i.best { background: var(--uebung); }
+.eckdaten { padding: 0 16px; display: flex; flex-direction: column; }
+.eckdaten div { min-height: 50px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--linie); font-size: 15px; }
+.eckdaten div:last-child { border-bottom: 0; }
+.eckdaten svg { color: var(--farbe); flex-shrink: 0; }
+.eckdaten span:first-of-type { flex: 1; }
+.eckdaten span:last-child { color: var(--text-2); text-align: right; }
+
+/* Zeilen als Knopf (Übungen auf der Übersicht, Einträge einer Übung) */
+button.eintrag-zeile { width: 100%; text-align: left; font: inherit; background: none; }
+.eintrag-zeile .marke { justify-self: end; }
+.ue-schnell { grid-template-columns: 36px minmax(0, 1fr) 26px; }
+.eintrag-inhalt.offen { color: var(--magen); font-weight: 600; }
+.termin-zeile .eintrag-text { gap: 3px; }
+.termin-notiz { margin: 0; font-size: 14px; color: var(--text-2); white-space: pre-line; }
+.termin-notiz b { color: var(--genesung); font-weight: 700; }
+
+/* Formulare der Genesung */
+.formular .eingabe-feld + .eingabe-feld { margin-top: 0; }
+.segment-wahl { display: grid; grid-template-columns: repeat(var(--spalten, 3), minmax(0, 1fr)); gap: 4px; }
+.segment-wahl label { position: relative; }
+.segment-wahl input { position: absolute; inset: 0; opacity: 0; margin: 0; }
+.segment-wahl span {
+  display: flex; align-items: center; justify-content: center; min-height: var(--tippen); border-radius: 12px; padding: 0 4px;
+  background: var(--karte); font-size: 14px; font-weight: 600; text-align: center;
+}
+.segment-wahl input:checked + span { background: var(--voll); color: #FFFFFF; }
+.segment-wahl input:focus-visible + span { outline: 2px solid var(--farbe); outline-offset: 2px; }
+.zahl-feld.rand { justify-content: flex-start; max-width: 200px; }
+.zahl-feld.rand input { text-align: left; font-size: 22px; }
+.zahl-zeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 16px; }
+.zahl-zeile input { width: 96px; text-align: center; }
+.formular .liste-links { padding: 2px 14px; }
+.formular .symbol-wahl span { background: var(--karte); }
+[hidden] { display: none !important; }
+
+/* Sheet von unten */
+.sheet {
+  --voll: color-mix(in srgb, var(--farbe) var(--voll-anteil), #000000);
+  position: fixed; inset: auto 0 0 0; margin: 0 auto; width: 100%; max-width: 640px; max-height: 88dvh;
+  border: 0; padding: 8px 16px calc(18px + var(--abstand-unten)); border-radius: 26px 26px 0 0;
+  background: var(--karte); color: var(--text); overflow-y: auto;
+  animation: sheet-rein 0.38s var(--sanft) both;
+}
+.sheet::backdrop { background: var(--schatten-sheet); animation: blende 0.3s both; }
+.sheet.zu { animation: sheet-raus 0.22s ease-in both; }
+.sheet.zu::backdrop { animation: blende 0.22s reverse both; }
+@keyframes sheet-rein { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheet-raus { to { transform: translateY(100%); } }
+@keyframes blende { from { opacity: 0; } to { opacity: 1; } }
+.sheet-griff { width: 38px; height: 5px; border-radius: 3px; background: var(--rand); margin: 0 auto 10px; }
+.sheet-kopf { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.sheet-kopf h2 { font-size: 22px; font-weight: 700; }
+.sheet-kopf p { margin: 2px 0 0; font-size: 13px; color: var(--text-2); }
+.sheet-inhalt { display: flex; flex-direction: column; gap: 10px; }
+.sheet .knopf:not(.haupt):not(.gefahr) { background: var(--fuellung); }
+.sheet .knopf.gefahr { background: var(--fuellung); }
+.ansicht > .knopf.haupt { background: color-mix(in srgb, var(--farbe, var(--schlaf)) var(--voll-anteil), #000000); }

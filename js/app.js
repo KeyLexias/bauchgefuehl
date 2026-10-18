@@ -10,6 +10,8 @@ import { personenListe, personBearbeiten } from './personen.js';
 import { listenUebersicht, listeBearbeiten } from './listen.js';
 import { kalender } from './kalender.js';
 import { anwenden as darstellungAnwenden } from './darstellung.js';
+import { genesungAnzeigen, istFormular, schnellEintrag } from './genesung.js';
+import { genesungLaden, mitSchmerzfragen } from './genesung-daten.js';
 
 const TABS = [
   { pfad: 'uebersicht', titel: 'Übersicht', symbol: 'uebersicht' },
@@ -60,10 +62,17 @@ function tabsZeichnen(aktiv) {
   tabs.style.setProperty('--tab-index', Math.max(index, 0));
 }
 
+// Eingaben und Formulare: ohne Tab-Leiste, und ein Update wartet, bis sie verlassen werden.
+function inEingabe() {
+  const teile = adresse();
+  return aktuellerPfad() === 'eintrag' || (teile[0] === 'genesung' && istFormular(teile.slice(1)));
+}
+
 // Wie tief eine Adresse liegt, für die Richtung des Seitenwechsels.
 function tiefe(teile) {
   const [pfad] = teile;
   if (pfad === 'eintrag') return 3;
+  if (pfad === 'genesung') return teile.length === 1 ? 0 : istFormular(teile.slice(1)) ? 3 : 2;
   if (pfad === 'einstellungen') return Math.min(teile.length, 3);
   return pfad === 'kalender' ? 1 : 0;
 }
@@ -113,16 +122,18 @@ async function eingabe(ziel) {
   const [, bereichId, teil, tagTeil] = adresse();
   const vorgabeTag = teil === 'neu' && GUELTIGER_TAG.test(tagTeil ?? '') ? tagTeil : undefined;
   let eintragId = teil === 'neu' ? undefined : teil;
-  const bereich = bereichId === 'beispiel' ? BEISPIEL : await holen(SPEICHER.config, bereichId);
-  if (!bereich || !BEREICHE[bereichId]) {
+  const gespeichert = bereichId === 'beispiel' ? BEISPIEL : await holen(SPEICHER.config, bereichId);
+  if (!gespeichert || !BEREICHE[bereichId] || !gespeichert.felder) {
     ziel.innerHTML = `<section class="karte leer"><h2>Bereich nicht gefunden</h2>
       <p>„${esc(bereichId)}" ist nicht eingerichtet.</p><a class="knopf" href="#/uebersicht">Zur Übersicht</a></section>`;
     return;
   }
-  const tagesweise = bereich.zeitart === 'tag';
+  const tagesweise = gespeichert.zeitart === 'tag';
   // Tagesweise Bereiche haben höchstens einen Eintrag pro Tag: vorhandenen öffnen statt neu anlegen.
-  if (!eintragId && tagesweise) eintragId = (await eintragAmTag(bereich.id, vorgabeTag ?? datumText()))?.id;
+  if (!eintragId && tagesweise) eintragId = (await eintragAmTag(gespeichert.id, vorgabeTag ?? datumText()))?.id;
   const eintrag = eintragId ? await holen(SPEICHER.eintraege, eintragId) : undefined;
+  // Je aktiver Beschwerde eine Schmerzfrage; neue Optionen werden aber in der gespeicherten Konfiguration abgelegt.
+  const bereich = gespeichert === BEISPIEL ? BEISPIEL : mitSchmerzfragen(gespeichert, await genesungLaden(), eintrag);
   if (eintragId && !eintrag) {
     ziel.innerHTML = `<section class="karte leer"><h2>Eintrag nicht gefunden</h2>
       <p>Er wurde vielleicht gelöscht.</p><a class="knopf" href="#/uebersicht">Zur Übersicht</a></section>`;
@@ -142,7 +153,7 @@ async function eingabe(ziel) {
       for (let i = 2; (feld.optionen ?? []).some((o) => o.id === id); i += 1) id = `${basis}_${i}`;
       const option = { id, titel: titel.trim() };
       feld.optionen = [...(feld.optionen ?? []), option];
-      if (bereich.id !== 'beispiel') await speichern(SPEICHER.config, bereich);
+      if (bereich.id !== 'beispiel') await speichern(SPEICHER.config, gespeichert);
       return option;
     },
     personen: await alle(SPEICHER.personen),
@@ -206,7 +217,6 @@ const ANSICHTEN = {
     const [, monat, tag] = adresse();
     return kalender(GUELTIGER_MONAT.test(monat ?? '') ? monat : datumText().slice(0, 7), GUELTIGER_TAG.test(tag ?? '') ? tag : undefined);
   },
-  genesung: () => spaeter('Genesung', '--genesung', 'genesung'),
   auswertung: () => spaeter('Auswertung', '--schlaf', 'auswertung'),
 };
 
@@ -220,14 +230,18 @@ async function einstellungen(ziel) {
   return einstellungenAnzeigen(ziel, { meldung, dauerhaft });
 }
 
+const umgebung = { meldung, neuZeichnen: () => zeichnen() };
+
 async function zeichnen() {
   const pfad = aktuellerPfad();
-  const istEingabe = pfad === 'eintrag';
-  if (updateWartet && !istEingabe) { location.reload(); return; }
-  document.body.classList.toggle('ohne-tabs', istEingabe);
+  const ohneTabs = inEingabe();
+  if (updateWartet && !ohneTabs) { location.reload(); return; }
+  document.body.classList.toggle('ohne-tabs', ohneTabs);
   tabsZeichnen(UNTERSEITEN.includes(pfad) ? 'uebersicht' : pfad);
+  ansicht.onclick = null; // Seiten mit eigener Bedienung setzen ihn neu
   try {
-    if (istEingabe) await eingabe(ansicht);
+    if (pfad === 'eintrag') await eingabe(ansicht);
+    else if (pfad === 'genesung') await genesungAnzeigen(ansicht, adresse().slice(1), umgebung);
     else if (pfad === 'einstellungen') await einstellungen(ansicht);
     else ansicht.innerHTML = await ANSICHTEN[pfad]();
   } catch (fehler) {
@@ -250,7 +264,7 @@ function serviceWorkerStarten() {
   const hatteSteuerung = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hatteSteuerung) return;
-    if (aktuellerPfad() === 'eintrag') updateWartet = true;
+    if (inEingabe()) updateWartet = true;
     else location.reload();
   });
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
@@ -264,6 +278,11 @@ function serviceWorkerStarten() {
 }
 
 window.addEventListener('hashchange', zeichnen);
+// Schnelleintrag einer Übung von der Übersicht
+ansicht.addEventListener('click', (e) => {
+  const k = e.target.closest('[data-schnell]');
+  if (k) schnellEintrag(k.dataset.schnell, k.dataset.tag, umgebung);
+});
 // Wechselt das iPhone zwischen hell und dunkel, passt sich die Statusleiste an.
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => darstellungAnwenden());
 darstellungAnwenden();
