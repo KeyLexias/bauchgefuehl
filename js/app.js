@@ -1,4 +1,5 @@
 import { symbol } from './symbole.js';
+import { seiteEinblenden } from './bewegung.js';
 import { alle, holen, speichern, loeschen, eintraegeZwischen, SPEICHER, dauerhaftAnfragen, neueId } from './db.js';
 import { BEISPIEL, BEREICHE } from './konfiguration.js';
 import { formularAnzeigen } from './formular.js';
@@ -45,11 +46,42 @@ export function meldung(text) {
   setTimeout(() => el.remove(), 2600);
 }
 
+// Die Leiste wird einmal gebaut; danach wandert nur die Kapsel zum aktiven Tab.
 function tabsZeichnen(aktiv) {
-  tabs.innerHTML = TABS.map((t) => `
-    <a href="#/${t.pfad}" ${t.pfad === aktiv ? 'aria-current="page"' : ''}>
-      ${symbol(t.symbol)}${t.titel}
-    </a>`).join('');
+  if (!tabs.childElementCount) {
+    tabs.innerHTML = `<span class="tabs-kapsel" aria-hidden="true"></span>${TABS.map((t) => `
+      <a href="#/${t.pfad}" data-tab="${t.pfad}">${symbol(t.symbol)}${t.titel}</a>`).join('')}`;
+  }
+  const index = TABS.findIndex((t) => t.pfad === aktiv);
+  for (const a of tabs.querySelectorAll('a')) {
+    if (a.dataset.tab === aktiv) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  }
+  tabs.style.setProperty('--tab-index', Math.max(index, 0));
+}
+
+// Wie tief eine Adresse liegt, für die Richtung des Seitenwechsels.
+function tiefe(teile) {
+  const [pfad] = teile;
+  if (pfad === 'eintrag') return 3;
+  if (pfad === 'einstellungen') return Math.min(teile.length, 3);
+  return pfad === 'kalender' ? 1 : 0;
+}
+
+let letzteAdresse = null;
+
+function richtung() {
+  const alt = letzteAdresse;
+  const neu = adresse();
+  letzteAdresse = neu;
+  if (!alt || alt.join('/') === neu.join('/')) return alt ? undefined : 'tab';
+  const [ta, tn] = [tiefe(alt), tiefe(neu)];
+  if (tn !== ta) return tn > ta ? 'vor' : 'zurueck';
+  // Andere Tage der Übersicht: neuerer Tag kommt von rechts
+  if (alt[0] === 'uebersicht' && neu[0] === 'uebersicht') {
+    return (neu[1] ?? datumText()) > (alt[1] ?? datumText()) ? 'vor' : 'zurueck';
+  }
+  return 'tab';
 }
 
 function speicherHinweis() {
@@ -206,7 +238,9 @@ async function zeichnen() {
         <p>${esc(fehler.message ?? fehler)}</p>
       </section>`;
   }
-  window.scrollTo(0, 0);
+  const r = richtung();
+  if (r) window.scrollTo(0, 0);
+  seiteEinblenden(ansicht, r);
 }
 
 function serviceWorkerStarten() {

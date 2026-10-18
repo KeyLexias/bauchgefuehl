@@ -1,5 +1,6 @@
 // Eingabe-Bildschirm: Kopf mit Datum und Uhrzeit, Felder aus der Konfiguration, Sichern.
 import { symbol } from './symbole.js';
+import { aufklappen, zustandMerken } from './bewegung.js';
 import { esc, zeitpunktText, datumText, zeitpunktLesbar, tagLesbar, tagVoll, tageszeitVon } from './hilfen.js';
 import { BEREICHE, alleFelder } from './konfiguration.js';
 import { feldZeichnen, wertLesen, wertSetzen, bereinigen, feldFinden, sucheTreffer } from './felder.js';
@@ -72,10 +73,13 @@ export function formularAnzeigen(ziel, optionen) {
     const block = element.closest('[data-wurzel]');
     if (!block) return undefined;
     const f = (bereich.felder ?? []).find((x) => x.id === block.dataset.wurzel);
+    const vorher = zustandMerken(block);
     const vorlage = document.createElement('template');
     vorlage.innerHTML = feldZeichnen(f, ctx()).trim();
     const neu = vorlage.content.firstElementChild;
     block.replaceWith(neu);
+    const { aktion, pfad, wert, delta } = element.dataset;
+    aufklappen(neu, vorher, element.matches('.wahl, .stern') ? { aktion, pfad, wert, delta } : undefined);
     return neu;
   };
 
