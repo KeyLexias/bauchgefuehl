@@ -1,6 +1,6 @@
 import { symbol } from './symbole.js';
 import { seiteEinblenden } from './bewegung.js';
-import { alle, holen, speichern, loeschen, eintraegeZwischen, SPEICHER, dauerhaftAnfragen, neueId } from './db.js';
+import { alle, holen, speichern, loeschen, eintraegeVon, eintraegeZwischen, SPEICHER, dauerhaftAnfragen, neueId } from './db.js';
 import { BEISPIEL, BEREICHE } from './konfiguration.js';
 import { formularAnzeigen } from './formular.js';
 import { esc, datumText, idsZaehlen } from './hilfen.js';
@@ -132,11 +132,19 @@ async function eingabe(ziel) {
   }
   const herkunftsTag = (eintrag?.zeitpunkt ?? vorgabeTag ?? datumText()).slice(0, 10);
   const zurueck = (tag = herkunftsTag) => { location.hash = tagAdresse(tag); };
+  // Wie oft jede Option vorkam, nur für die Reihenfolge der Suchtreffer. Erst nach dem Einblenden zählen:
+  // Tausende Einträge zu lesen ließe die Seite am iPhone ruckeln.
+  const nutzung = new Map();
+  const hier = location.hash;
+  setTimeout(async () => {
+    if (location.hash !== hier || bereichId === 'beispiel') return;
+    for (const [id, n] of idsZaehlen(await eintraegeVon(gespeichert.id))) nutzung.set(id, n);
+  }, 450);
   formularAnzeigen(ziel, {
     bereich,
     eintrag,
     vorgabeTag,
-    nutzung: idsZaehlen(await alle(SPEICHER.eintraege)),
+    nutzung,
     // Im Suchfeld neu angelegte Einträge werden Teil der Konfiguration und damit der Sicherung.
     optionAnlegen: async (feld, titel) => {
       const basis = `eigen_${titel.toLocaleLowerCase('de').replace(/[^a-z0-9äöüß]+/g, '_').replace(/^_|_$/g, '') || 'eintrag'}`;

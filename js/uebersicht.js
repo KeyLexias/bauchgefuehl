@@ -153,7 +153,7 @@ export async function uebersicht(tag, speicherHinweis = '') {
     ${await wochenleiste(tag)}
     ${await sicherungsBanner()}
     ${kacheln || karten ? `<div class="tageskarten">${kacheln}${karten}</div>` : ''}
-    ${uebungenFuerTag(tag, await genesungKontext())}
+    ${uebungenFuerTag(tag, await genesungKontext({ mitSchmerz: false }))}
     <section class="abschnitt">
       <h2>Einträge</h2>
       ${liste ? `<div class="karte eintraege">${liste}</div>` : '<p class="fussnote links">An diesem Tag noch nichts eingetragen.</p>'}

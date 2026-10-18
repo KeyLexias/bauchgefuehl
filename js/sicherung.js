@@ -10,17 +10,17 @@ export const SICHERUNG_DATEI = 'bauchgefuehl-backup.json';
 const APP = 'bauchgefuehl';
 const FORMAT = 1;
 
-/** Gesamter Inhalt als Datei im Sicherungsformat. */
-export async function sicherungErstellen() {
-  const inhalt = await allesLesen();
+/** Gesamter Inhalt als Datei im Sicherungsformat. `inhalt`: schon gelesen (allesLesen), sonst wird gelesen. */
+export async function sicherungErstellen(inhalt) {
+  inhalt ??= await allesLesen();
   const daten = { app: APP, format: FORMAT, art: 'sicherung', erstellt: new Date().toISOString(), ...inhalt };
   const text = JSON.stringify(daten);
   return { datei: new File([text], SICHERUNG_DATEI, { type: 'application/json' }), daten };
 }
 
-/** CSV-Dateien aller Bereiche mit CSV-Zuordnung. */
-export async function csvDateienErstellen() {
-  const { config, eintraege, personen } = await allesLesen();
+/** CSV-Dateien aller Bereiche mit CSV-Zuordnung. `inhalt` wie bei sicherungErstellen. */
+export async function csvDateienErstellen(inhalt) {
+  const { config, eintraege, personen } = inhalt ?? await allesLesen();
   const dateien = config
     .filter((b) => b.csv?.datei && BEREICHE[b.id])
     .map((b) => new File([bereichAlsCsv(b, eintraege, personen)], b.csv.datei, { type: 'text/csv' }));

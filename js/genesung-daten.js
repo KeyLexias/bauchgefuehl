@@ -27,7 +27,7 @@
 //   { art: 'termin', beschwerde, titel, notiz, anordnung }           anordnung true: Notiz gilt als Anordnung
 //   { art: 'status', beschwerde, status }
 // Die Schmerzwerte stehen im Eintrag des Bereichs mit der Schmerzfrage (siehe mitSchmerzfragen).
-import { alle, holen, speichern, SPEICHER } from './db.js';
+import { alle, eintraegeVon, holen, speichern, SPEICHER } from './db.js';
 import { alsDatum, datumText, tageVerschieben, zeitpunktText } from './hilfen.js';
 
 export const GENESUNG = 'genesung';
@@ -307,8 +307,13 @@ export function genesungAlsCsv(genesung, configs, eintraege) {
     .join('');
 }
 
-/** Alles, was die Genesungs-Ansichten brauchen, in einem Zug. */
-export async function genesungKontext() {
-  const [genesung, configs, eintraege] = await Promise.all([genesungLaden(), alle(SPEICHER.config), alle(SPEICHER.eintraege)]);
+/**
+ * Alles, was die Genesungs-Ansichten brauchen, in einem Zug. Gelesen werden nur die Einträge der Genesung und der
+ * Bereiche mit Schmerzfragen, nicht alle. Ohne `mitSchmerz` (Übersicht) nur die der Genesung.
+ */
+export async function genesungKontext({ mitSchmerz = true } = {}) {
+  const [genesung, configs] = await Promise.all([genesungLaden(), alle(SPEICHER.config)]);
+  const bereiche = [GENESUNG, ...(mitSchmerz ? configs.filter(istSchmerzBereich).map((b) => b.id) : [])];
+  const eintraege = (await Promise.all(bereiche.map(eintraegeVon))).flat();
   return { genesung: genesung ?? genesungNeu(), configs, eintraege };
 }

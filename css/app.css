@@ -147,6 +147,11 @@ h1, h2, h3 { font-family: var(--rund); margin: 0; }
 :focus-visible { outline: 2px solid var(--schlaf); outline-offset: 2px; }
 
 /* Grundlayout */
+/* Beim Seitenwechsel kommt die neue Seite um ein paar Pixel seitlich versetzt herein. Ohne Bühne wäre das Dokument
+   dabei kurz breiter als der Bildschirm und ließe sich am iPhone seitlich verschieben. „clip" schneidet nur ab,
+   ohne eigenen Scrollbereich, und lässt die Senkrechte frei. */
+.buehne { overflow-x: clip; }
+
 .ansicht {
   padding: calc(var(--abstand-oben) + 12px) 16px calc(110px + var(--abstand-unten));
   display: flex;

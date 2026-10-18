@@ -1,6 +1,6 @@
 // Daten-Seite: Sichern, Wiederherstellen, CSV-Export und -Import.
 import { symbol } from './symbole.js';
-import { alle, anzahl, metaHolen, SPEICHER } from './db.js';
+import { alle, allesLesen, anzahl, metaHolen, SPEICHER } from './db.js';
 import { esc } from './hilfen.js';
 import { kopf } from './uebersicht.js';
 import {
@@ -127,18 +127,31 @@ export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '', einge
     </section>
     ${speicherHinweis}`;
 
-  // Dateien vorbereiten, damit der Teilen-Dialog direkt aus dem Tipp heraus öffnen kann.
-  const sicherung = eingerichtet ? await sicherungErstellen() : null;
-  const csvDateien = eintraege ? await csvDateienErstellen() : [];
+  // Der Teilen-Dialog öffnet nur direkt aus einem Tipp heraus, die Dateien müssen dann schon bereitliegen.
+  // JSON und CSV aller Daten zu erzeugen dauert am iPhone spürbar, deshalb erst nach dem Einblenden der Seite.
+  // Tippt man vorher, wird auf die Vorbereitung gewartet.
+  const sichernKnopf = ziel.querySelector('[data-aktion="sichern"]');
+  let vorbereitung;
+  const dateienVorbereiten = () => {
+    vorbereitung ??= (async () => {
+      const inhalt = await allesLesen();
+      const sicherung = eingerichtet ? await sicherungErstellen(inhalt) : null;
+      await new Promise((weiter) => setTimeout(weiter)); // zwei kurze Arbeitsschritte statt einem langen
+      return { sicherung, csvDateien: eintraege ? await csvDateienErstellen(inhalt) : [] };
+    })().catch((fehler) => { vorbereitung = undefined; throw fehler; });
+    return vorbereitung;
+  };
+  if (eingerichtet || eintraege) setTimeout(() => { if (sichernKnopf.isConnected) dateienVorbereiten(); }, 600);
 
   const neuLaden = () => datenAnzeigen(ziel, { meldung, speicherHinweis, eingebettet });
   const bericht = ziel.querySelector('[data-bericht]');
 
-  ziel.querySelector('[data-aktion="sichern"]')?.addEventListener('click', async (e) => {
-    if (!sicherung) return;
+  sichernKnopf.addEventListener('click', async (e) => {
     const knopf = e.currentTarget;
     knopf.disabled = true;
     try {
+      const { sicherung } = await dateienVorbereiten();
+      if (!sicherung) return;
       const ergebnis = await teilen([sicherung.datei]);
       if (ergebnis !== 'abgebrochen') {
         await sicherungVermerken(sicherung.daten.erstellt);
@@ -154,6 +167,7 @@ export async function datenAnzeigen(ziel, { meldung, speicherHinweis = '', einge
 
   ziel.querySelector('[data-aktion="csv-export"]')?.addEventListener('click', async () => {
     try {
+      const { csvDateien } = await dateienVorbereiten();
       const ergebnis = await teilen(csvDateien);
       if (ergebnis !== 'abgebrochen') meldung(`${csvDateien.length} CSV-Dateien ${ergebnis === 'geteilt' ? 'erstellt' : 'heruntergeladen'}`);
     } catch (fehler) {

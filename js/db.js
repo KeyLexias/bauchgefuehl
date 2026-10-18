@@ -79,6 +79,13 @@ export async function anzahl(speicher) {
   return alsPromise(db.transaction(speicher).objectStore(speicher).count());
 }
 
+/** Einträge eines Bereichs, über den Index statt über alle Einträge. */
+export async function eintraegeVon(bereich) {
+  const db = await oeffnen();
+  const index = db.transaction(SPEICHER.eintraege).objectStore(SPEICHER.eintraege).index('bereich');
+  return alsPromise(index.getAll(bereich));
+}
+
 export async function eintraegeZwischen(von, bis) {
   const db = await oeffnen();
   const index = db.transaction(SPEICHER.eintraege).objectStore(SPEICHER.eintraege).index('zeitpunkt');
