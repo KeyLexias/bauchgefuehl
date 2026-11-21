@@ -1,9 +1,10 @@
 // Einstellungen: Darstellung, Daten, Verwaltung von Personen und Listen, Infos zur App.
 import { symbol } from './symbole.js';
-import { anzahl, metaHolen, metaSetzen, SPEICHER } from './db.js';
+import { alle, metaHolen, metaSetzen, SPEICHER } from './db.js';
 import { esc } from './hilfen.js';
 import { DARSTELLUNGEN, darstellungLesen, darstellungSetzen } from './darstellung.js';
 import { datenAnzeigen } from './daten.js';
+import { eigeneListen } from './personen.js';
 
 export const ERINNERUNG_STANDARD = 7;
 const ERINNERUNG_STUFEN = [3, 7, 14, 30];
@@ -35,7 +36,9 @@ async function appInfo(dauerhaft) {
 export async function einstellungenAnzeigen(ziel, { meldung, dauerhaft }) {
   const darstellung = darstellungLesen();
   const tage = await erinnerungTage();
-  const [personen, info] = await Promise.all([anzahl(SPEICHER.personen), appInfo(dauerhaft)]);
+  const [allePersonen, configs, info] = await Promise.all([alle(SPEICHER.personen), alle(SPEICHER.config), appInfo(dauerhaft)]);
+  const personen = allePersonen.filter((p) => !p.liste).length;
+  const listen = eigeneListen(configs).map((l) => ({ ...l, anzahl: allePersonen.filter((p) => p.liste === l.id).length }));
 
   ziel.innerHTML = `
     <a class="zurueck-link" href="#/uebersicht">${symbol('zurueck', 20)}Übersicht</a>
@@ -73,6 +76,11 @@ export async function einstellungenAnzeigen(ziel, { meldung, dauerhaft }) {
           <span><strong>Personen</strong><span>${zahl.format(personen)} · umbenennen, zusammenführen, ausblenden</span></span>
           ${symbol('weiter', 18)}
         </a>
+        ${listen.map((l) => `<a href="#/einstellungen/personen/liste/${encodeURIComponent(l.id)}" style="--farbe: var(--genesung)">
+          <span class="symbol-klein">${symbol('arzt', 20)}</span>
+          <span><strong>${esc(l.titel)}</strong><span>${zahl.format(l.anzahl)} · umbenennen, zusammenführen, ausblenden</span></span>
+          ${symbol('weiter', 18)}
+        </a>`).join('')}
         <a href="#/einstellungen/listen" style="--farbe: var(--magen)">
           <span class="symbol-klein">${symbol('stift', 20)}</span>
           <span><strong>Listen und Optionen</strong><span>umbenennen, ausblenden, eigene anlegen</span></span>

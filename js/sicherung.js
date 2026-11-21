@@ -25,7 +25,7 @@ export async function csvDateienErstellen(inhalt) {
     .filter((b) => b.csv?.datei && BEREICHE[b.id])
     .map((b) => new File([bereichAlsCsv(b, eintraege, personen)], b.csv.datei, { type: 'text/csv' }));
   const genesung = config.find((b) => b.id === GENESUNG);
-  const text = genesung ? genesungAlsCsv(genesung, config, eintraege) : '';
+  const text = genesung ? genesungAlsCsv(genesung, config, eintraege, personen) : '';
   if (text) dateien.push(new File([text], GENESUNG_CSV, { type: 'text/csv' }));
   return dateien;
 }

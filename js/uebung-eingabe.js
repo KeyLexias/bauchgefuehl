@@ -53,6 +53,7 @@ export function uebungEingabe(ziel, optionen) {
     if (eintrag) return '';
     const s = tagesStand(uebung, liste, zustand.zeitpunkt.slice(0, 10));
     const wann = zustand.zeitpunkt.slice(0, 10) === datumText() ? 'Heute' : 'An diesem Tag';
+    if (s.wunsch) return `${wann} ${s.anzahl}× · Pflicht ${s.soll}, Wunsch ${s.wunsch}`;
     if (s.soll > 1) return `${wann} ${s.anzahl} von ${s.soll}`;
     return s.anzahl ? `${wann} schon eingetragen` : '';
   };

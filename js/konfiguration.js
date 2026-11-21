@@ -13,6 +13,8 @@
 //   ohneEintragNormal  true: es wird nur eingetragen, wenn etwas ist. Ein Tag mit anderen Einträgen, aber ohne Eintrag
 //              hier, zählt in der Auswertung als Normalfall (bester Wert der Befinden-Skala, keine Auswahl).
 //   ohneEingabe  true: Daten kommen nur über den Import, keine Kachel auf der Übersicht, keine Punkte im Kalender
+//   gruppe     optional { id, titel, symbol }: Bereiche mit derselben Gruppe teilen sich auf der Übersicht eine breite
+//              Kachel; Antippen fragt, welcher Bereich. gruppeReihenfolge ordnet die Auswahl.
 //   gruppen    optional, für Freitext-Felder mit Rolle 'essen': [{ id, titel, muster }], muster ist ein
 //              regulärer Ausdruck (ohne Groß-/Kleinschreibung). Die Auswertung vergleicht Tage mit und ohne Treffer.
 //   felder     Liste von Feldern
@@ -37,6 +39,9 @@
 //             exklusiv je Option: wählt alle anderen ab, z. B. „nichts"
 //             ohneJeOption je Option: jeOption-Felder entfallen für diese Option
 //   person:   immer mit Suchfeld; zusatz optional, erscheint sobald eine Person gewählt ist (Werte flach daneben)
+//             liste optional: eigene Personenliste (z. B. für Fachleute), listeTitel ihr Name in den Einstellungen;
+//             ohne liste die allgemeine Personenliste
+//   einfach:  optionenAus 'beschwerden': Optionen sind die Beschwerden der Genesung (nicht in der Konfiguration)
 //   zahl:     einheit, schritt, min, max, nachkomma
 //   dauer:    stufen [{ id, titel, minuten }] oder ohne stufen freie Eingabe in Minuten
 //   janein:   darstellung 'knoepfe' | 'schalter'
@@ -53,6 +58,13 @@
 //   hinweis (Text, der erscheint, sobald die Option gewählt ist; die Auswertung zählt solche Angaben als Warnzeichen),
 //   sondertag (bei Rolle 'besonderheit': Tage mit dieser Option zählen bei Zusammenhängen nicht mit),
 //   zusatz (Felder, die direkt darunter aufklappen, wenn die Option gewählt ist),
+//   bilanz ('gut' | 'beschwerde') und bilanzFuer (Bereich-Id): Tagesantwort für einen Bereich mit ohneEintragNormal.
+//              'gut' zählt den Tag als beschwerdefrei, 'beschwerde' als Tag mit Beschwerden, auch ohne Eintrag dort.
+//   oeffnet (Bereich-Id): nach dem Sichern geht es direkt zu einem neuen Eintrag in diesem Bereich,
+//              oeffnetHinweis kleiner Text dazu unter der Auswahl
+//   beobachten  true: die Auswertung zeigt, wie oft die Option vorkommt (Anteil pro Woche)
+//   terminFelder  Fragen eines Termin-Fensters (bei einer Mehrfachauswahl): ist die Option gewählt, zeigt die Eingabe
+//              die Termine des Tages und „Termin hinzufügen". Jeder Termin ist ein eigener Eintrag der Genesung.
 //   ausgeblendet
 //
 // Werte eines Eintrags (eintrag.werte):
@@ -104,7 +116,7 @@ export function pruefen(bereich) {
     if (ids.has(f.id)) fehler.push(`Feld-Id „${f.id}" kommt doppelt vor.`);
     ids.add(f.id);
     if (!FELDTYPEN.includes(f.typ)) fehler.push(`Feld „${f.id}" hat unbekannten Typ „${f.typ}".`);
-    if ((f.typ === 'einfach' || f.typ === 'mehrfach') && !f.optionen?.length && f.darstellung !== 'suche') {
+    if ((f.typ === 'einfach' || f.typ === 'mehrfach') && !f.optionen?.length && f.darstellung !== 'suche' && !f.optionenAus) {
       fehler.push(`Feld „${f.id}" hat keine Optionen.`);
     }
   }

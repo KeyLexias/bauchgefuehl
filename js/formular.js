@@ -11,7 +11,10 @@ import { neueId } from './db.js';
  * optionen: bereich (Konfiguration), eintrag (zum Bearbeiten, optional), personen,
  *           nutzung (Map Id → Anzahl, für die Reihenfolge der Suchtreffer),
  *           personAnlegen(name) → Person, optionAnlegen(feld, titel) → Option,
- *           sichern(eintrag), abbrechen()
+ *           sichern(eintrag), abbrechen(),
+ *           vorgabe optional { pfad, wert }: setzt einen Wert vor und scrollt zu seinem Feld,
+ *           termineZeichnen(option, pfad, tag) → HTML und terminOeffnen(id?, tag) → Eintrag | 'geloescht' | null:
+ *           Termine des Tages unter einer Option mit `terminFelder`
  */
 export function formularAnzeigen(ziel, optionen) {
   const { bereich } = optionen;
@@ -33,7 +36,12 @@ export function formularAnzeigen(ziel, optionen) {
     }
   }
 
-  const ctx = () => ({ werte: zustand.werte, personen: zustand.personen, ui: zustand.ui, nutzung: optionen.nutzung });
+  if (optionen.vorgabe) wertSetzen(zustand.werte, optionen.vorgabe.pfad, optionen.vorgabe.wert);
+
+  const ctx = () => ({
+    werte: zustand.werte, personen: zustand.personen, ui: zustand.ui, nutzung: optionen.nutzung,
+    termine: optionen.termineZeichnen ? (o, pfad) => optionen.termineZeichnen(o, pfad, zustand.zeitpunkt.slice(0, 10)) : undefined,
+  });
 
   const zeitAnzeige = () => {
     if (!tagesweise) return zeitpunktLesbar(zustand.zeitpunkt);
@@ -67,6 +75,10 @@ export function formularAnzeigen(ziel, optionen) {
       <button type="button" class="knopf haupt" data-aktion="sichern">Sichern</button>
     </div>`;
   ziel.replaceChildren(wurzel);
+  if (optionen.vorgabe) {
+    const block = wurzel.querySelector(`[data-wurzel="${CSS.escape(optionen.vorgabe.pfad[0])}"]`);
+    setTimeout(() => block?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 350);
+  }
 
   // Einen Feldblock (oberste Ebene) neu zeichnen, damit Zusatzfragen auf- und zuklappen.
   const neuZeichnen = (element) => {
@@ -105,6 +117,13 @@ export function formularAnzeigen(ziel, optionen) {
     const w = el.dataset.wert;
 
     switch (aktion) {
+      case 'termin': {
+        // Termin-Fenster; nach dem Sichern bleibt die Option gewählt und die Liste wird neu gezeichnet.
+        const ergebnis = await optionen.terminOeffnen?.(w || undefined, zustand.zeitpunkt.slice(0, 10));
+        if (!ergebnis) return;
+        if (ergebnis !== 'geloescht') wertSetzen(zustand.werte, pfad, wertLesen(zustand.werte, pfad) ?? {});
+        break;
+      }
       case 'waehlen': {
         const neu = 'zahl' in el.dataset ? Number(w) : w;
         // Nochmal antippen hebt die Auswahl auf.
@@ -154,7 +173,7 @@ export function formularAnzeigen(ziel, optionen) {
         sucheFokussieren(neuZeichnen(el), pfad);
         return;
       case 'person-neu': {
-        const person = await optionen.personAnlegen(el.dataset.name);
+        const person = await optionen.personAnlegen(el.dataset.name, feldFinden(bereich.felder, pfad[pfad.length - 1]));
         zustand.personen.push(person);
         wertSetzen(zustand.werte, pfad, [...(wertLesen(zustand.werte, pfad) ?? []), person.id]);
         sucheFokussieren(neuZeichnen(el), pfad);

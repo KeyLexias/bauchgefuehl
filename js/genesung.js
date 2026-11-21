@@ -7,9 +7,10 @@ import { esc, datumText, tageVerschieben, alsDatum, zeitpunktText, tagVoll } fro
 import {
   GENESUNG, MESSARTEN, EINHEITEN, STATUS, EINSTELLUNGEN, genesungKontext, genesungSichern, beschwerdeFinden, uebungFinden,
   aktiveUebungen, idAus, uebungsEintraege, termine, anordnung, naechsterTermin, tagesStand, tageVerlauf, bestwert,
-  schmerzWerte, rhythmusText, zielText, einstellungText, wertAnzeige, inSekunden,
+  schmerzWerte, rhythmusText, zielText, einstellungText, wertAnzeige, inSekunden, terminQuellen, wunschVon, spanneText,
 } from './genesung-daten.js';
 import { uebungEingabe, sheetOeffnen } from './uebung-eingabe.js';
+import { terminFenster } from './termin.js';
 
 const fmtTagKurz = new Intl.DateTimeFormat('de-AT', { day: 'numeric', month: 'short' });
 const fmtMonat = new Intl.DateTimeFormat('de-AT', { month: 'short', year: 'numeric' });
@@ -23,6 +24,64 @@ const monatText = (jm) => (jm ? fmtMonat.format(alsDatum(`${jm}-01`)) : '');
 
 // Symbole für Beschwerden zur Auswahl im Formular.
 const SYMBOL_AUSWAHL = ['genesung', 'herz', 'person', 'blitz', 'feuer', 'tropfen', 'stern', 'arzt', 'aktivitaet', 'welle', 'magen', 'schlaf'];
+// Symbole für Übungen
+const UEBUNG_SYMBOLE = [
+  'ue-haengen', 'ue-liegen', 'ue-rolle', 'ue-dehnen', 'ue-nacken', 'ue-ruecken', 'ue-schulter', 'ue-hand', 'ue-bein',
+  'ue-gewicht', 'ue-band', 'ue-ball', 'ue-matte', 'ue-atmung', 'ue-anspannung', 'ue-gehen', 'uhr', 'ue-creme',
+  'ue-waschen', 'ue-tablette', 'tropfen', 'ue-zaehne', 'ue-gurgeln', 'ue-kaelte', 'ue-waerme', 'haken',
+];
+
+/**
+ * Knopf oder Link zu einem Termin: mit Termin-Fenster aus der Konfiguration als Knopf (öffnet das Fenster),
+ * sonst wie früher als Link zum eigenen Formular.
+ */
+function terminZiel(k, b, e) {
+  if (terminQuellen(k.configs).length) return `button type="button" data-termin="${esc(e?.id ?? '')}" data-beschwerde="${esc(b.id)}"`;
+  return `a href="${adresse(b.id, 'termin', e?.id ?? 'neu')}"`;
+}
+const zielEnde = (k) => (terminQuellen(k.configs).length ? 'button' : 'a');
+const terminZeit = (e) => fmtTermin.format(alsDatum(e.zeitpunkt));
+
+/** Klick auf einen Termin-Knopf: Fenster öffnen, danach neu zeichnen. */
+async function terminKlick(e, k, umgebung) {
+  const t = e.target.closest('[data-termin]');
+  if (!t) return false;
+  const eintrag = k.eintraege.find((x) => x.id === t.dataset.termin);
+  const ergebnis = await terminFenster({ eintrag, beschwerde: t.dataset.beschwerde, meldung: umgebung.meldung });
+  if (ergebnis) umgebung.neuZeichnen();
+  return true;
+}
+
+/**
+ * Fortschrittsbalken einer Übung an einem Tag: Füllung bis zur Anzahl, Markierungen bei Pflicht und Wunsch.
+ * Ab der Pflicht gilt der Tag als erledigt, darüber ist Bonus.
+ */
+export function fortschritt(stand) {
+  const { anzahl, soll, wunsch } = stand;
+  if (!wunsch && soll <= 1) return '';
+  const max = Math.max(wunsch ?? soll, anzahl, 1);
+  const pos = (n) => `${Math.round((n / max) * 1000) / 10}%`;
+  const ton = wunsch && anzahl >= wunsch ? 'wunsch' : anzahl >= soll ? 'pflicht' : '';
+  return `<span class="fortschritt ${ton}" role="img" aria-label="${anzahl} von ${soll} Pflicht${wunsch ? `, Wunsch ${wunsch}` : ''}">
+      <i class="fortschritt-fuell" style="width:${pos(Math.min(anzahl, max))}"></i>
+      <i class="fortschritt-marke pflicht" style="left:${pos(soll)}"></i>
+      ${wunsch ? `<i class="fortschritt-marke wunsch" style="left:${pos(wunsch)}"></i>` : ''}
+    </span>`;
+}
+
+/** Kurzer Stand eines Tages, z. B. „1 von 1 · Pflicht erledigt, Wunsch 4". */
+function standText(stand, heute) {
+  const { anzahl, soll, wunsch } = stand;
+  if (wunsch) {
+    if (anzahl >= wunsch) return `${anzahl}× · Wunsch erreicht`;
+    if (anzahl >= soll) return `${anzahl}× · Pflicht erledigt, Wunsch ${wunsch}`;
+    if (anzahl) return `${anzahl} von ${soll} Pflicht · Wunsch ${wunsch}`;
+    return heute ? `Noch offen · Pflicht ${soll}, Wunsch ${wunsch}` : 'Nicht eingetragen';
+  }
+  if (stand.erledigt) return soll > 1 ? `${anzahl} von ${soll}, erledigt` : 'Erledigt';
+  if (anzahl) return `${anzahl} von ${soll}`;
+  return heute ? 'Noch offen' : 'Nicht eingetragen';
+}
 
 /** SVG aus einem Symbolnamen oder einem eigenen Pfad der Konfiguration. */
 function bild(objekt, ersatz, groesse = 22) {
@@ -52,7 +111,7 @@ export async function genesungAnzeigen(ziel, teile, umgebung) {
   const beschwerde = beschwerdeFinden(k.genesung, a);
   if (!beschwerde) return nichtGefunden(ziel, 'Beschwerde nicht gefunden');
   if (b === 'bearbeiten') return beschwerdeFormular(ziel, k, beschwerde, umgebung);
-  if (b === 'termine') return termineSeite(ziel, k, beschwerde);
+  if (b === 'termine') return termineSeite(ziel, k, beschwerde, umgebung);
   if (b === 'termin') return terminFormular(ziel, k, beschwerde, c === 'neu' ? undefined : c, umgebung);
   if (b === 'uebung' && c === 'neu') return uebungFormular(ziel, k, beschwerde, undefined, umgebung);
   const uebung = uebungFinden(beschwerde, c);
@@ -105,6 +164,7 @@ async function tab(ziel, k, umgebung) {
     </details>` : ''}`;
 
   ziel.onclick = async (e) => {
+    if (await terminKlick(e, k, umgebung)) return;
     const s = e.target.closest('[data-status]');
     if (s) { statusSheet(beschwerdeFinden(k.genesung, s.dataset.status), umgebung); return; }
     const r = e.target.closest('[data-reaktivieren]');
@@ -118,9 +178,9 @@ async function tab(ziel, k, umgebung) {
 
 function aktivKarte(b, k) {
   const werte = schmerzWerte(b, k.configs, k.eintraege);
-  const liste = termine(k.eintraege, b.id);
-  const ord = anordnung(b, k.eintraege);
-  const naechster = naechsterTermin(b, k.eintraege);
+  const liste = termine(k.eintraege, b.id, k);
+  const ord = anordnung(b, k.eintraege, k);
+  const naechster = naechsterTermin(b, k.eintraege, k);
   const uebungen = aktiveUebungen(b);
   const untertitel = [b.beschreibung, b.seit && `seit ${monatText(b.seit)}`].filter(Boolean).join(' · ');
   return `
@@ -141,11 +201,11 @@ function aktivKarte(b, k) {
         <span>
           ${ord ? `<strong>${esc([ord.von, ord.datum && tagKurz(ord.datum)].filter(Boolean).join(' · ') || 'Anordnung')}</strong>
             <span>${esc(ord.text)}</span>` : ''}
-          ${naechster ? `<span class="naechster">Nächster Termin: ${esc(fmtTermin.format(alsDatum(naechster.zeitpunkt)))}${naechster.werte.titel ? ` · ${esc(naechster.werte.titel)}` : ''}</span>` : ''}
+          ${naechster ? `<span class="naechster">Nächster Termin: ${esc(terminZeit(naechster))}${naechster.werte.titel ? ` · ${esc(naechster.werte.titel)}` : ''}</span>` : ''}
         </span>
       </a>` : ''}
       <div class="beschwerde-knoepfe">
-        <a class="knopf zart" href="${adresse(b.id, 'termin', 'neu')}">Termin eintragen</a>
+        <${terminZiel(k, b)} class="knopf zart">Termin eintragen</${zielEnde(k)}>
         <button type="button" class="knopf" data-status="${esc(b.id)}">Status ändern</button>
       </div>
       ${liste.length ? `<a class="textlink klein mitte" href="${adresse(b.id, 'termine')}">Alle Termine (${liste.length})</a>` : ''}
@@ -188,15 +248,16 @@ function uebungZeile(b, u, k) {
   const soll = u.proTag ?? 1;
   const stand = tagesStand(u, liste, datumText());
   const gemacht = verlauf.filter((t) => t.anzahl >= soll).length;
+  const wunsch = wunschVon(u);
   const text = stand.woche
     ? `${rhythmusText(u)} · diese Woche ${stand.woche.anzahl} von ${stand.woche.soll}`
-    : `${[zielText(u), rhythmusText(u)].filter(Boolean).join(' · ')} · ${gemacht} von 7`;
+    : `${[zielText(u), rhythmusText(u)].filter(Boolean).join(' · ')} · Pflicht an ${gemacht} von 7`;
   return `
     <a class="ue-zeile" href="${adresse(b.id, 'uebung', u.id)}" style="--farbe: var(--uebung)">
       <span class="symbol-klein">${uebungsBild(u, 20)}</span>
-      <span class="ue-text"><strong>${esc(u.titel)}</strong><span>${esc(text)}</span></span>
-      <span class="ue-tage" aria-label="Letzte 7 Tage: ${gemacht} gemacht">
-        ${verlauf.map((t) => `<i class="${t.anzahl >= soll ? 'an' : t.anzahl ? 'halb' : ''}"></i>`).join('')}
+      <span class="ue-text"><strong>${esc(u.titel)}</strong><span>${esc(text)}</span>${fortschritt(stand)}</span>
+      <span class="ue-tage" aria-label="Letzte 7 Tage: Pflicht an ${gemacht} erfüllt">
+        ${verlauf.map((t) => `<i class="${wunsch && t.anzahl >= wunsch ? 'an bonus' : t.anzahl >= soll ? 'an' : t.anzahl ? 'halb' : ''}"></i>`).join('')}
       </span>
     </a>`;
 }
@@ -276,6 +337,7 @@ function uebungSeite(ziel, k, b, u, umgebung) {
   const eckdaten = [
     ['Messart', `${MESSARTEN[u.messart]?.titel}${u.einheit && !abhaken ? ` in ${EINHEITEN[u.einheit]}` : ''}`, MESSARTEN[u.messart]?.symbol],
     ['Rhythmus', rhythmusText(u), 'wiederholen'],
+    wunschVon(u) ? ['Pro Tag', spanneText(u), 'haken'] : null,
     u.ziel ? ['Ziel', zielText(u), 'stern'] : null,
     best && !abhaken ? ['Bestwert', `${wertAnzeige(best.werte.wert, best.werte.einheit)} am ${tagKurz(best.zeitpunkt.slice(0, 10))}`, 'stern'] : null,
     u.angeordnet?.von || u.angeordnet?.datum
@@ -294,11 +356,16 @@ function uebungSeite(ziel, k, b, u, umgebung) {
       <div><h1>${esc(u.titel)}</h1><p>${esc(unterzeile)}</p></div>
     </header>
     ${u.beendet ? `<p class="hinweis-zart">Beendet am ${esc(tagVoll(u.beendet))}. Unter „Bearbeiten" wieder aufnehmen.</p>` : ''}
+    ${fortschritt(tagesStand(u, liste, heute)) ? `<section class="karte ue-heute" style="--farbe: var(--uebung)">
+      <div class="teil-kopf"><h2>Heute</h2><span class="vergleich">${esc(standText(tagesStand(u, liste, heute), true))}</span></div>
+      ${fortschritt(tagesStand(u, liste, heute))}
+      <div class="fortschritt-legende"><span><i class="pflicht"></i>Pflicht ${u.proTag ?? 1}</span>${wunschVon(u) ? `<span><i class="wunsch"></i>Wunsch ${wunschVon(u)}</span>` : ''}</div>
+    </section>` : ''}
     <section class="karte ue-karte" data-eingabe></section>
     ${liste.some((e) => e.zeitpunkt.slice(0, 10) === heute) ? `<section class="abschnitt"><h2>Heute</h2>
       <div class="karte eintraege">${liste.filter((e) => e.zeitpunkt.slice(0, 10) === heute).map(eintragZeile).join('')}</div></section>` : ''}
     <section class="karte ue-woche" style="--farbe: var(--uebung)">
-      <div class="teil-kopf"><h2>Letzte 7 Tage</h2><span class="vergleich ton-gut">${gemacht} von 7 gemacht</span></div>
+      <div class="teil-kopf"><h2>Letzte 7 Tage</h2><span class="vergleich ton-gut">${soll > 1 || wunschVon(u) ? 'Pflicht an ' : ''}${gemacht} von 7${soll > 1 || wunschVon(u) ? '' : ' gemacht'}</span></div>
       <div class="woche-diagramm" role="img" aria-label="Letzte sieben Tage">${balken}</div>
     </section>
     <section class="karte eckdaten" style="--farbe: var(--uebung)">
@@ -355,10 +422,8 @@ export function uebungenFuerTag(tag, k) {
   const offen = zeilen.filter((z) => z.stand.offen).length;
   const zeile = ({ b, u, stand }) => {
     let text;
-    if (stand.erledigt) text = stand.soll > 1 ? `${stand.anzahl} von ${stand.soll}, erledigt` : 'Erledigt';
-    else if (stand.woche && !stand.offen) text = `Wochenziel erreicht (${stand.woche.anzahl} von ${stand.woche.soll})`;
-    else if (stand.anzahl) text = `${stand.anzahl} von ${stand.soll}`;
-    else text = heute ? 'Noch offen' : 'Nicht eingetragen';
+    if (!stand.erledigt && stand.woche && !stand.offen) text = `Wochenziel erreicht (${stand.woche.anzahl} von ${stand.woche.soll})`;
+    else text = standText(stand, heute);
     if (stand.woche && stand.offen) text += ` · diese Woche ${stand.woche.anzahl} von ${stand.woche.soll}`;
     const fertig = stand.erledigt || (stand.woche && !stand.offen);
     return `
@@ -367,6 +432,7 @@ export function uebungenFuerTag(tag, k) {
         <span class="eintrag-text">
           <span class="eintrag-titel"><strong>${esc(u.titel)}</strong><span>${esc(b.titel)}</span></span>
           <span class="eintrag-inhalt ${stand.offen && heute ? 'offen' : ''}">${esc(text)}</span>
+          ${fortschritt(stand)}
         </span>
         <span class="marke ${fertig ? 'erledigt' : ''}" role="img" aria-label="${fertig ? 'Erledigt' : 'Offen'}">${symbol(fertig ? 'haken' : 'plus', 16, 2.6)}</span>
       </button>`;
@@ -399,30 +465,32 @@ export async function schnellEintrag(schluessel, tag, umgebung) {
 
 // ---------- Termine ----------
 
-function termineSeite(ziel, k, b) {
-  const liste = termine(k.eintraege, b.id);
+function termineSeite(ziel, k, b, umgebung) {
+  const liste = termine(k.eintraege, b.id, k);
   const jetzt = zeitpunktText();
   const kommend = liste.filter((e) => e.zeitpunkt > jetzt).reverse();
   const vergangen = liste.filter((e) => e.zeitpunkt <= jetzt);
   const zeile = (e) => `
-    <a class="eintrag-zeile termin-zeile" href="${adresse(b.id, 'termin', e.id)}" style="--farbe: var(--genesung)">
+    <${terminZiel(k, b, e)} class="eintrag-zeile termin-zeile" style="--farbe: var(--genesung)">
       <span class="symbol-klein">${symbol('kalender', 18)}</span>
       <span class="eintrag-text">
-        <span class="eintrag-titel"><strong>${esc(e.werte.titel || 'Termin')}</strong><span>${esc(fmtTermin.format(alsDatum(e.zeitpunkt)))}</span></span>
+        <span class="eintrag-titel"><strong>${esc(e.werte.titel || 'Termin')}</strong><span>${esc(terminZeit(e))}</span></span>
         ${e.werte.notiz ? `<span class="termin-notiz">${e.werte.anordnung ? '<b>Anordnung</b> ' : ''}${esc(e.werte.notiz)}</span>` : ''}
       </span>
       ${symbol('weiter', 18)}
-    </a>`;
+    </${zielEnde(k)}>`;
   ziel.innerHTML = `
     <a class="zurueck-link" href="#/genesung" style="color: var(--genesung)">${symbol('zurueck', 20)}Genesung</a>
     <header class="kopf"><h1>Termine</h1><p class="kopf-unter">${esc(b.titel)}</p></header>
-    <a class="knopf haupt" href="${adresse(b.id, 'termin', 'neu')}" style="--farbe: var(--genesung)">${symbol('plus', 20)}Termin eintragen</a>
+    <${terminZiel(k, b)} class="knopf haupt breit" style="--farbe: var(--genesung)">${symbol('plus', 20)}Termin eintragen</${zielEnde(k)}>
+    ${terminQuellen(k.configs).slice(0, 1).map((q) => `<p class="fussnote links">Termine gehen auch ${q.bereichTitel ? `im ${esc(q.bereichTitel)}` : 'im Tageseintrag'} unter „${esc(q.optionTitel)}“, mehrere pro Tag. Mit Beschwerde erscheinen sie hier.</p>`).join('')}
     ${kommend.length ? `<section class="abschnitt"><h2>Kommend</h2><div class="karte eintraege">${kommend.map(zeile).join('')}</div></section>` : ''}
     ${vergangen.length ? `<section class="abschnitt"><h2>Vergangen</h2><div class="karte eintraege">${vergangen.map(zeile).join('')}</div></section>` : ''}
     ${!liste.length ? '<p class="fussnote">Noch keine Termine.</p>' : ''}
     ${b.anordnung?.text ? `<section class="abschnitt"><h2>Anordnung aus der Startdatei</h2>
       <div class="karte"><p class="termin-notiz">${esc(b.anordnung.text)}</p></div>
       <p class="fussnote links">Gilt, bis ein Termin mit Anordnung eingetragen ist.</p></section>` : ''}`;
+  ziel.onclick = (e) => { terminKlick(e, k, umgebung); };
 }
 
 function terminFormular(ziel, k, b, eintragId, umgebung) {
@@ -637,9 +705,18 @@ function uebungFormular(ziel, k, b, u, umgebung) {
         ${segment('rhythmus', [['taeglich', 'Täglich'], ['woche', 'Pro Woche']], typeof rhythmus === 'number' ? 'woche' : 'taeglich')}
         <label class="zahl-zeile" data-nur-woche><span>So oft pro Woche</span>
           <input class="eingabe-feld" type="number" inputmode="numeric" min="1" max="7" name="proWoche" value="${proWoche}"></label>
-        <label class="zahl-zeile"><span>Einträge pro Tag</span>
+        <label class="zahl-zeile"><span>Pflicht pro Tag</span>
           <input class="eingabe-feld" type="number" inputmode="numeric" min="1" max="10" name="proTag" value="${u?.proTag ?? 1}"></label>
-        <p class="feld-hilfe">Bei mehr als einem Eintrag pro Tag zeigt die App „1 von 2" und bietet weitere an.</p>
+        <label class="zahl-zeile"><span>Wunsch pro Tag<small>optional</small></span>
+          <input class="eingabe-feld" type="number" inputmode="numeric" min="1" max="20" name="wunsch" value="${u?.wunsch ?? ''}" placeholder="–"></label>
+        <p class="feld-hilfe">Ab der Pflicht gilt der Tag als erledigt. Der Wunsch ist eine Markierung im Fortschrittsbalken, alles darüber ist Bonus.</p>
+      </section>
+      <section class="feld">
+        <h2 class="feld-titel">Symbol</h2>
+        <div class="symbol-wahl" role="radiogroup" aria-label="Symbol">
+          ${u?.pfad ? `<label><input type="radio" name="symbol" value="eigen" checked><span>${uebungsBild(u, 20)}</span></label>` : ''}
+          ${UEBUNG_SYMBOLE.map((sy) => `<label><input type="radio" name="symbol" value="${sy}" ${!u?.pfad && (u?.symbol ?? 'haken') === sy ? 'checked' : ''} aria-label="${esc(sy.replace('ue-', ''))}"><span>${symbol(sy, 20)}</span></label>`).join('')}
+        </div>
       </section>
       <section class="feld">
         <h2 class="feld-titel">Angeordnet<span class="optional"> · optional</span></h2>
@@ -707,6 +784,8 @@ function uebungFormular(ziel, k, b, u, umgebung) {
       rhythmus: f.rhythmus.value === 'woche' ? (zahl('proWoche', 1, 7) ?? 3) : 'taeglich',
       proTag: zahl('proTag', 1, 10) ?? 1,
     };
+    const wunsch = zahl('wunsch', 1, 20);
+    neu.wunsch = wunsch && wunsch > neu.proTag ? wunsch : undefined;
     const gb = beschwerdeFinden(genesung, b.id);
     gb.uebungen ??= [];
     let gu = u && uebungFinden(gb, u.id);
@@ -722,6 +801,7 @@ function uebungFormular(ziel, k, b, u, umgebung) {
       gu.ab = heute;
     }
     Object.assign(gu, { titel, hinweis: f.hinweis.value.trim() || undefined }, neu);
+    if (f.symbol.value && f.symbol.value !== 'eigen') { gu.symbol = f.symbol.value; delete gu.pfad; }
     for (const s of EINSTELLUNGEN) if (gu[s] === undefined) delete gu[s];
     const von = f.von.value.trim();
     gu.angeordnet = von || f.datum.value ? { von: von || undefined, datum: f.datum.value || undefined } : undefined;

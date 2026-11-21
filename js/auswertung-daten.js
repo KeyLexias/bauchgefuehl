@@ -1,8 +1,8 @@
 // Rechenteil der Auswertung. Arbeitet nur über Bereiche, Feldtypen und Rollen, nie über konkrete Inhalte.
-import { alle, SPEICHER } from './db.js';
+import { alle, metaHolen, SPEICHER } from './db.js';
 import { BEREICHE, TAGESZEITEN } from './konfiguration.js';
 import { alsDatum, datumText, tageVerschieben, tageszeitVon } from './hilfen.js';
-import { GENESUNG, schmerzWerte } from './genesung-daten.js';
+import { GENESUNG, schmerzWerte, mitBeschwerden, terminQuellen } from './genesung-daten.js';
 
 export const ZEITRAEUME = [
   { id: '30', titel: '30 Tage', tage: 30 },
@@ -82,7 +82,7 @@ export const TAGESZEIT_SPALTEN = TAGESZEITEN.filter((t) => t.uhrzeit);
  * bereiche (Ids mit Eintrag), wahl (Schlüssel „bereich.feld=option"), zahlen (Schlüssel → Werte), texte (Freitext mit Rolle essen).
  */
 function neuerTag(tag) {
-  return { tag, bereiche: new Set(), wahl: new Set(), zahlen: new Map(), texte: [] };
+  return { tag, bereiche: new Set(), wahl: new Set(), zahlen: new Map(), texte: [], bilanz: new Map(), normal: new Set(), eingetragen: new Set() };
 }
 
 export function tageBauen(bereiche, eintraege) {
@@ -95,29 +95,65 @@ export function tageBauen(bereiche, eintraege) {
     if (!tage.has(tag)) tage.set(tag, neuerTag(tag));
     const t = tage.get(tag);
     t.bereiche.add(b.id);
+    t.eingetragen.add(b.id);
     for (const { feld: f, wert: v } of werteVon(b.felder, e.werte)) {
       const k = `${b.id}.${f.id}`;
       if (f.typ === 'skala' || f.typ === 'zahl') {
         if (typeof v === 'number') t.zahlen.set(k, [...(t.zahlen.get(k) ?? []), v]);
-      } else if (f.typ === 'einfach') t.wahl.add(`${k}=${v}`);
+      } else if (f.typ === 'einfach') {
+        t.wahl.add(`${k}=${v}`);
+        // Tagesantwort für einen anderen Bereich (z. B. „alles gut" / „gab was")
+        const o = (f.optionen ?? []).find((x) => x.id === v);
+        if (o?.bilanz && o.bilanzFuer) t.bilanz.set(o.bilanzFuer, o.bilanz);
+      }
       else if (f.typ === 'mehrfach') for (const id of Object.keys(v)) t.wahl.add(`${k}=${id}`);
       else if (f.typ === 'person') for (const id of v) t.wahl.add(`${k}=${id}`);
       else if (f.typ === 'janein' && v === true) t.wahl.add(`${k}=ja`);
       else if (f.typ === 'text' && f.rolle === 'essen') t.texte.push(String(v).toLocaleLowerCase('de'));
     }
   }
+  // Tage mit einem Termin zählen als Tage mit der Termin-Option, auch wenn sie dort nicht angetippt wurde.
+  const q = terminQuellen(bereiche)[0];
+  if (q) {
+    for (const e of eintraege) {
+      if (e.bereich !== GENESUNG || e.werte?.art !== 'termin') continue;
+      const t = tage.get(e.zeitpunkt.slice(0, 10));
+      if (t) t.wahl.add(`${q.bereich}.${q.feld}=${q.option}`);
+    }
+  }
   // Bereiche, in denen nur Abweichungen eingetragen werden: Ein erfasster Tag ohne Eintrag dort gilt als Normalfall,
   // also bester Wert auf den Befinden-Skalen und keine Auswahl.
   const erfasst = new Set(bereiche.filter((b) => !b.ohneEingabe).map((b) => b.id));
+  // Mit Tagesantwort „Beschwerde" ist der Tag erfasst, aber kein Normalfall, auch ohne Eintrag.
   for (const b of bereiche.filter((x) => x.ohneEintragNormal)) {
     const skalen = (b.felder ?? []).filter((f) => f.typ === 'skala' && f.rolle === 'befinden');
     for (const t of tage.values()) {
       if (t.bereiche.has(b.id) || ![...t.bereiche].some((id) => erfasst.has(id))) continue;
       t.bereiche.add(b.id);
+      if (t.bilanz.get(b.id) === 'beschwerde') continue;
+      t.normal.add(b.id);
       for (const f of skalen) t.zahlen.set(`${b.id}.${f.id}`, [f.max ?? 5]);
     }
   }
   return tage;
+}
+
+/**
+ * Beschwerdefrei an einem Tag für einen Bereich mit ohneEintragNormal: true, false oder null (nicht erfasst).
+ * Eine Tagesantwort entscheidet; ohne Antwort zählt wie bisher: kein Eintrag heißt beschwerdefrei,
+ * ein Eintrag mit Symptom oder schlechterem Befinden heißt Beschwerden.
+ */
+export function beschwerdefrei(b, t) {
+  if (!t) return null;
+  const antwort = t.bilanz.get(b.id);
+  if (antwort === 'gut') return true;
+  if (antwort === 'beschwerde') return false;
+  if (!t.bereiche.has(b.id)) return null;
+  if (t.normal.has(b.id)) return true;
+  const symptom = symptomFelder(b).some((f) => [...t.wahl].some((w) => w.startsWith(`${b.id}.${f.id}=`)));
+  const befinden = (b.felder ?? []).filter((f) => f.typ === 'skala' && f.rolle === 'befinden')
+    .some((f) => (tagesWert(t, `${b.id}.${f.id}`) ?? f.max ?? 5) < (f.max ?? 5));
+  return !(symptom || befinden);
 }
 
 /** Erfasste Tage eines Bereichs im Zeitraum, mit Normaltagen ohne Eintrag (siehe ohneEintragNormal). */
@@ -136,10 +172,12 @@ export async function auswertungLaden() {
   const [configs, eintraege, personen, healthTage] = await Promise.all([
     alle(SPEICHER.config), alle(SPEICHER.eintraege), alle(SPEICHER.personen), alle(SPEICHER.health),
   ]);
+  const genesung = configs.find((b) => b.id === GENESUNG);
+  // Fragen mit den Beschwerden als Optionen bekommen ihre Namen.
   const bereiche = configs
     .filter((b) => BEREICHE[b.id] && b.id !== GENESUNG && b.felder?.length && !b.ausgeblendet)
+    .map((b) => mitBeschwerden(b, genesung))
     .sort((a, b) => (a.reihenfolge ?? 99) - (b.reihenfolge ?? 99));
-  const genesung = configs.find((b) => b.id === GENESUNG);
   const tage = tageBauen(bereiche, eintraege);
   const erster = eintraege.reduce((m, e) => (e.zeitpunkt < m ? e.zeitpunkt : m), datumText()).slice(0, 10);
   const ersterJe = {};
@@ -148,7 +186,8 @@ export async function auswertungLaden() {
     if (!ersterJe[e.bereich] || t < ersterJe[e.bereich]) ersterJe[e.bereich] = t;
   }
   const health = new Map(healthTage.map((d) => [d.tag, d]));
-  return { configs, bereiche, genesung, eintraege, personen, tage, erster, ersterJe, health };
+  const experimente = (await metaHolen('experimente')) ?? [];
+  return { configs, bereiche, genesung, eintraege, personen, tage, erster, ersterJe, health, experimente };
 }
 
 export const bereich = (k, id) => k.bereiche.find((b) => b.id === id);

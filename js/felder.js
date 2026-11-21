@@ -76,6 +76,7 @@ function einfachZeichnen(f, ctx, basis) {
 
   const opt = (f.optionen ?? []).find((o) => o.id === gewaehlt);
   if (opt?.hinweis) html += hinweisBox(opt.hinweis);
+  if (opt?.oeffnetHinweis) html += `<p class="feld-hilfe weiter-hinweis">${symbol('weiter', 14, 2.4)}${esc(opt.oeffnetHinweis)}</p>`;
   if (opt && sichtbar(opt.zusatz).length) {
     // Zusatzfragen einer Einfachauswahl liegen flach neben dem Feld.
     html += `<div class="zusatz">${sichtbar(opt.zusatz).map((z) => feldZeichnen(z, ctx, basis, true)).join('')}</div>`;
@@ -143,6 +144,8 @@ function mehrfachZeichnen(f, ctx, basis) {
       if (!auswahl[o.id]) continue;
       if (o.hinweis) hinweise.push(o.hinweis);
       html += optionsFragen(o, true);
+      // Option mit eigenem Termin-Fenster: Termine des Tages und „hinzufügen", gezeichnet vom Formular
+      if (o.terminFelder && ctx.termine) html += ctx.termine(o, [...pfad, o.id]);
     }
   }
   return html + hinweise.map(hinweisBox).join('');
@@ -192,8 +195,11 @@ function sucheGewaehlt(f, wert) {
   return wert ? [wert] : [];
 }
 
+/** Personen der Liste eines Felds: mit `liste` nur diese, sonst die allgemeine Liste. */
+export const personenVon = (f, personen) => personen.filter((p) => (p.liste ?? '') === (f.liste ?? ''));
+
 function sucheKandidaten(f, ctx) {
-  if (f.typ === 'person') return ctx.personen.filter((p) => !p.ausgeblendet).map((p) => ({ id: p.id, titel: p.name, person: p }));
+  if (f.typ === 'person') return personenVon(f, ctx.personen).filter((p) => !p.ausgeblendet).map((p) => ({ id: p.id, titel: p.name, person: p }));
   return (f.optionen ?? []).filter((o) => !o.ausgeblendet).map((o) => ({ id: o.id, titel: o.titel, option: o }));
 }
 

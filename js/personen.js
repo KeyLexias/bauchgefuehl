@@ -2,6 +2,7 @@
 import { symbol } from './symbole.js';
 import { alle, holen, speichern, loeschen, vieleSpeichern, SPEICHER } from './db.js';
 import { esc, initialen, farbeVon, idsZaehlen } from './hilfen.js';
+import { alleFelder } from './konfiguration.js';
 
 const zahl = new Intl.NumberFormat('de-AT');
 const norm = (t) => String(t ?? '').trim().toLocaleLowerCase('de');
@@ -41,11 +42,29 @@ function idErsetzen(eintraege, von, nach) {
   return geaendert;
 }
 
-/** Liste aller Personen mit Suche. */
-export async function personenListe(ziel) {
-  const [personen, eintraege] = await Promise.all([alle(SPEICHER.personen), alle(SPEICHER.eintraege)]);
+/**
+ * Eigene Personenlisten aus der Konfiguration (Personen-Felder mit `liste`): [{ id, titel }].
+ */
+export function eigeneListen(configs) {
+  const listen = new Map();
+  for (const b of configs) {
+    const termin = alleFelder(b.felder).flatMap((f) => (f.optionen ?? []).flatMap((o) => o.terminFelder ?? []));
+    for (const f of [...alleFelder(b.felder), ...termin]) {
+      if (f.typ === 'person' && f.liste && !listen.has(f.liste)) listen.set(f.liste, { id: f.liste, titel: f.listeTitel ?? f.titel });
+    }
+  }
+  return [...listen.values()];
+}
+
+const listeAdresse = (liste) => (liste ? `#/einstellungen/personen/liste/${encodeURIComponent(liste)}` : '#/einstellungen/personen');
+
+/** Liste der Personen mit Suche: die allgemeine oder eine eigene Liste (`liste`). */
+export async function personenListe(ziel, { liste } = {}) {
+  const [allePersonen, eintraege, configs] = await Promise.all([alle(SPEICHER.personen), alle(SPEICHER.eintraege), alle(SPEICHER.config)]);
   const nutzung = idsZaehlen(eintraege);
+  const personen = allePersonen.filter((p) => (p.liste ?? '') === (liste ?? ''));
   personen.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const titel = liste ? (eigeneListen(configs).find((l) => l.id === liste)?.titel ?? 'Liste') : 'Personen';
 
   const zeile = (p) => `
     <a class="person-zeile" href="#/einstellungen/personen/${esc(p.id)}" data-name="${esc(norm(p.name))}">
@@ -56,14 +75,14 @@ export async function personenListe(ziel) {
 
   ziel.innerHTML = `
     <a class="zurueck-link" href="#/einstellungen">${symbol('zurueck', 20)}Einstellungen</a>
-    <header class="kopf"><h1>Personen</h1></header>
-    <p class="fussnote links">Ausgeblendete Personen erscheinen nicht mehr in der Suche, alte Einträge bleiben.
+    <header class="kopf"><h1>${esc(titel)}</h1></header>
+    <p class="fussnote links">${liste ? 'Neue Namen legst du direkt bei der Eingabe an. ' : ''}Ausgeblendete erscheinen nicht mehr in der Suche, alte Einträge bleiben.
       Zusammenführen hilft bei doppelten Namen.</p>
     <label class="suche-eingabe" style="--farbe: var(--aktivitaet)">${symbol('suche', 18)}
       <input type="search" placeholder="${zahl.format(personen.length)} Personen durchsuchen" data-filter autocomplete="off" aria-label="Personen durchsuchen">
     </label>
     <div class="karte personen-liste" style="--farbe: var(--aktivitaet)">
-      ${personen.map(zeile).join('') || '<p class="fussnote">Noch keine Personen.</p>'}
+      ${personen.map(zeile).join('') || `<p class="fussnote">${liste ? 'Noch niemand eingetragen.' : 'Noch keine Personen.'}</p>`}
     </div>`;
 
   ziel.querySelector('[data-filter]').addEventListener('input', (e) => {
@@ -82,10 +101,13 @@ export async function personBearbeiten(ziel, id, { meldung }) {
   }
   const nutzung = idsZaehlen(eintraege);
   const anzahl = nutzung.get(person.id) ?? 0;
-  const andere = personen.filter((p) => p.id !== person.id).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  // Zusammenführen nur innerhalb derselben Liste
+  const andere = personen.filter((p) => p.id !== person.id && (p.liste ?? '') === (person.liste ?? ''))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const zurueckZu = listeAdresse(person.liste);
 
   ziel.innerHTML = `
-    <a class="zurueck-link" href="#/einstellungen/personen">${symbol('zurueck', 20)}Personen</a>
+    <a class="zurueck-link" href="${zurueckZu}">${symbol('zurueck', 20)}${person.liste ? 'Liste' : 'Personen'}</a>
     <header class="person-kopf" style="--farbe: var(--aktivitaet)">
       ${avatar(person)}
       <div><h1>${esc(person.name)}</h1><p>${eintraegeText(anzahl)}</p></div>
@@ -170,6 +192,6 @@ export async function personBearbeiten(ziel, id, { meldung }) {
     if (!confirm(`„${person.name}" löschen?`)) return;
     await loeschen(SPEICHER.personen, person.id);
     meldung('Gelöscht');
-    location.hash = '#/einstellungen/personen';
+    location.hash = zurueckZu;
   });
 }

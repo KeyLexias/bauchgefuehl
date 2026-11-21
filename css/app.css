@@ -1055,3 +1055,94 @@ div.kennzahl:active { transform: none; }
   background: var(--fuellung); color: var(--text); font: inherit; font-size: 14px; line-height: 1.45;
 }
 .banner.warnung { grid-template-columns: 26px minmax(0, 1fr); }
+
+/* ---------- Übersicht: breite Gruppen-Kachel ---------- */
+.tageskarte.breit {
+  grid-column: 1 / -1; min-height: 72px; flex-direction: row; align-items: center; justify-content: flex-start;
+  gap: 12px; width: 100%; text-align: left; font: inherit; color: inherit; border: 0;
+}
+.tageskarte.breit .tageskarte-text { flex: 1; }
+.tageskarte.breit:active { transform: scale(0.98); }
+.gruppe-wahl .eintrag-zeile { min-height: 64px; }
+.weiter-hinweis { display: flex; align-items: center; gap: 4px; color: var(--farbe); font-weight: 600; }
+
+/* ---------- Übungen: Fortschritt mit Pflicht und Wunsch ---------- */
+.fortschritt {
+  position: relative; display: block; height: 8px; margin: 6px 6px 2px 0; border-radius: 4px;
+  background: var(--fuellung);
+}
+.fortschritt-fuell {
+  position: absolute; inset: 0 auto 0 0; border-radius: 4px; max-width: 100%;
+  background: color-mix(in srgb, var(--uebung) 45%, var(--fuellung)); transition: width 0.4s var(--feder);
+}
+.fortschritt.pflicht .fortschritt-fuell, .fortschritt.wunsch .fortschritt-fuell { background: var(--uebung); }
+.fortschritt-marke {
+  position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--text);
+}
+.fortschritt-marke.wunsch { background: var(--text-3); }
+.fortschritt-marke.pflicht:first-of-type { opacity: 0.8; }
+.fortschritt-legende { display: flex; gap: 14px; font-size: 12px; color: var(--text-2); }
+.fortschritt-legende i { display: inline-block; width: 2px; height: 10px; margin-right: 5px; vertical-align: -1px; background: var(--text); }
+.fortschritt-legende i.wunsch { background: var(--text-3); }
+.ue-heute { display: flex; flex-direction: column; gap: 8px; }
+.ue-heute .teil-kopf h2 { font-family: var(--rund); font-size: 17px; font-weight: 700; }
+.ue-text .fortschritt { width: 100%; }
+.ue-tage i.bonus { box-shadow: inset 0 -5px 0 color-mix(in srgb, #FFFFFF 45%, transparent); }
+.zahl-zeile span small { display: block; font-size: 12px; color: var(--text-2); }
+
+/* ---------- Auswertung: Abschnitte, Klappen, Bilanz ---------- */
+.auswertung-abschnitt { display: flex; flex-direction: column; gap: 10px; }
+.auswertung-abschnitt > h2 { font-family: var(--rund); font-size: 22px; font-weight: 700; padding: 0 4px; }
+.abschnitt-unter { margin: -6px 0 0; padding: 0 4px; font-size: 13px; color: var(--text-2); }
+.kennzahl.bilanz { min-height: 92px; }
+.pfeil { font-family: var(--rund); font-size: 18px; font-weight: 700; margin-left: 2px; color: var(--text-3); }
+.pfeil.ton-gut { color: var(--ton-gut); }
+.pfeil.ton-schlecht { color: var(--ton-schlecht); }
+
+.klappe { padding: 0; box-shadow: var(--karte-schatten); }
+.klappe + .klappe { margin-top: 10px; }
+.klappe summary {
+  display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 16px; cursor: pointer; list-style: none;
+  font-size: 16px;
+}
+.klappe summary::-webkit-details-marker { display: none; }
+.klappe summary .symbol-klein { --farbe: var(--akzent); }
+.klappe summary .anzeigen { margin-left: auto; color: var(--text-3); font-size: 14px; font-weight: 500; }
+.klappe summary .anzeigen::after { content: "Anzeigen"; }
+.klappe[open] summary .anzeigen::after { content: "Ausblenden"; }
+.klappe-inhalt { display: flex; flex-direction: column; gap: 12px; padding: 0 10px 12px; }
+.klappe-inhalt:empty { display: none; }
+.klappe-inhalt > .karte, .klappe-inhalt > .auswertung-karte { background: var(--fuellung); box-shadow: none; }
+.klappe-inhalt .auswertung-karte .kennzahl { background: var(--karte); }
+.klappe-inhalt .kennzahl { background: var(--karte); box-shadow: none; }
+
+.erkenntnis-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.erkenntnis-liste li { padding: 10px 12px 10px 14px; border-radius: 12px; background: var(--fuellung); border-left: 4px solid var(--text-3); }
+.erkenntnis-liste li.ton-gut { border-left-color: var(--ton-gut); }
+.erkenntnis-liste li.ton-schlecht { border-left-color: var(--ton-schlecht); }
+.erkenntnis-liste p { margin: 0; font-size: 15px; line-height: 1.4; }
+.erkenntnis-liste span { font-size: 12px; color: var(--text-2); }
+
+.experiment .karte-kopf h2 { flex: 1; }
+.experiment .karte-kopf .textknopf { margin: 0; min-width: var(--tippen); justify-content: center; }
+.experiment-tabelle { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.experiment-tabelle th, .experiment-tabelle td { padding: 7px 4px; text-align: right; border-top: 1px solid var(--linie); }
+.experiment-tabelle thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.experiment-tabelle tbody th { text-align: left; font-weight: 600; }
+.experiment-tabelle td.ton-gut { color: var(--ton-gut); font-weight: 700; }
+.experiment-tabelle td.ton-schlecht { color: var(--ton-schlecht); font-weight: 700; }
+.experiment-form { display: flex; flex-direction: column; gap: 12px; }
+.experiment-form .feld { display: flex; flex-direction: column; gap: 6px; }
+.experiment-form .feld-titel { font-size: 14px; }
+.sheet .zeitraum-wahl button[aria-pressed="true"] { background: var(--karte); }
+.auswertung-abschnitt > .knopf:not(.haupt) { background: var(--karte); box-shadow: var(--karte-schatten); color: var(--akzent); }
+
+/* ---------- Termine: Liste im Tages-Eintrag und Fenster ---------- */
+.termine-block { display: flex; flex-direction: column; gap: 10px; --farbe: var(--genesung); }
+.termine-block .karte.eintraege { background: var(--karte); }
+.termine-block .knopf.zart { background: color-mix(in srgb, var(--genesung) 14%, var(--karte)); color: var(--genesung); }
+.sheet .eingabe-kopf, .sheet .eingabe-leiste .textknopf { display: none; }
+.sheet .eingabe-leiste { justify-content: center; margin-bottom: 4px; }
+.sheet .eingabe { padding-bottom: 0; }
+.sheet .wahl:not([aria-pressed="true"]), .sheet .eingabe-feld, .sheet .suche-eingabe { background: var(--fuellung); }
+.sheet .feld { margin-bottom: 4px; }

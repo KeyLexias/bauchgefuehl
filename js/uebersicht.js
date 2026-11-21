@@ -5,6 +5,7 @@ import { BEREICHE } from './konfiguration.js';
 import { esc, datumText, tageVerschieben, alsDatum } from './hilfen.js';
 import { zusammenfassen } from './zusammenfassung.js';
 import { uebungenFuerTag } from './genesung.js';
+import { sheetOeffnen } from './uebung-eingabe.js';
 import { genesungKontext } from './genesung-daten.js';
 
 const datumLang = new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -104,18 +105,31 @@ export async function uebersicht(tag, speicherHinweis = '') {
 
   const schnell = bereiche.filter((b) => b.zeitart !== 'tag');
   const tagesweise = bereiche.filter((b) => b.zeitart === 'tag');
+  const einzeln = schnell.filter((b) => !b.gruppe?.id);
+  const gruppen = gruppenVon(schnell);
+  const anzahlText = (n) => (n === 0 ? 'Neuer Eintrag' : n === 1 ? '1 Eintrag' : `${n} Einträge`);
 
-  const kacheln = schnell.map((b) => {
+  const kacheln = einzeln.map((b) => {
     const n = eintraege.filter((e) => e.bereich === b.id).length;
-    const text = n === 0 ? 'Neuer Eintrag' : n === 1 ? '1 Eintrag' : `${n} Einträge`;
     return `
     <a class="tageskarte" href="${neuAdresse(b.id, tag)}" style="--farbe: ${farbe(b)}">
       <span class="tageskarte-kopf">
         <span class="symbol-voll">${sym(b)}</span>
         <span class="marke" aria-hidden="true">${symbol('plus', 16, 2.6)}</span>
       </span>
-      <span class="tageskarte-text"><strong>${esc(name(b))}</strong><span>${text}</span></span>
+      <span class="tageskarte-text"><strong>${esc(name(b))}</strong><span>${anzahlText(n)}</span></span>
     </a>`;
+  }).join('');
+
+  // Breite Kachel je Gruppe; welcher Bereich, fragt das Sheet.
+  const gruppenKacheln = gruppen.map((g) => {
+    const n = eintraege.filter((e) => g.bereiche.some((b) => b.id === e.bereich)).length;
+    return `
+    <button type="button" class="tageskarte breit" data-gruppe="${esc(g.id)}" data-tag="${esc(tag)}" style="--farbe: ${farbe(g.bereiche[0])}">
+      <span class="symbol-voll">${symbol(g.symbol ?? BEREICHE[g.bereiche[0].id].symbol, 22)}</span>
+      <span class="tageskarte-text"><strong>${esc(g.titel)}</strong><span>${anzahlText(n)}</span></span>
+      <span class="marke" aria-hidden="true">${symbol('plus', 16, 2.6)}</span>
+    </button>`;
   }).join('');
 
   const karten = tagesweise.map((b) => {
@@ -132,6 +146,8 @@ export async function uebersicht(tag, speicherHinweis = '') {
       </a>`;
   }).join('');
 
+  // In der Liste tragen Bereiche einer Gruppe den Namen der Gruppe.
+  const zeilenName = (b) => b.gruppe?.titel ?? name(b);
   const liste = eintraege
     .filter((e) => schnell.some((b) => b.id === e.bereich))
     .sort((a, b) => a.zeitpunkt.localeCompare(b.zeitpunkt))
@@ -141,7 +157,7 @@ export async function uebersicht(tag, speicherHinweis = '') {
         <a class="eintrag-zeile" href="#/eintrag/${b.id}/${e.id}" style="--farbe: ${farbe(b)}">
           <span class="symbol-klein">${sym(b)}</span>
           <span class="eintrag-text">
-            <span class="eintrag-titel"><strong>${esc(name(b))}</strong><span>${fmtUhr.format(alsDatum(e.zeitpunkt))}</span></span>
+            <span class="eintrag-titel"><strong>${esc(zeilenName(b))}</strong><span>${fmtUhr.format(alsDatum(e.zeitpunkt))}</span></span>
             <span class="eintrag-inhalt">${esc(zusammenfassen(b, e, personen) || 'Ohne Angaben')}</span>
           </span>
           ${symbol('weiter', 18)}
@@ -152,11 +168,45 @@ export async function uebersicht(tag, speicherHinweis = '') {
     ${kopf('Bauchgefühl', tag)}
     ${await wochenleiste(tag)}
     ${await sicherungsBanner()}
-    ${kacheln || karten ? `<div class="tageskarten">${kacheln}${karten}</div>` : ''}
+    ${karten || gruppenKacheln || kacheln ? `<div class="tageskarten">${karten}${gruppenKacheln}${kacheln}</div>` : ''}
     ${uebungenFuerTag(tag, await genesungKontext({ mitSchmerz: false }))}
     <section class="abschnitt">
       <h2>Einträge</h2>
       ${liste ? `<div class="karte eintraege">${liste}</div>` : '<p class="fussnote links">An diesem Tag noch nichts eingetragen.</p>'}
     </section>
     ${speicherHinweis}`;
+}
+
+/** Gruppen der Schnelleinträge in Reihenfolge: [{ id, titel, symbol, bereiche }]. */
+function gruppenVon(bereiche) {
+  const gruppen = new Map();
+  for (const b of bereiche) {
+    if (!b.gruppe?.id) continue;
+    if (!gruppen.has(b.gruppe.id)) gruppen.set(b.gruppe.id, { ...b.gruppe, bereiche: [] });
+    gruppen.get(b.gruppe.id).bereiche.push(b);
+  }
+  for (const g of gruppen.values()) {
+    g.bereiche.sort((a, b) => (a.gruppeReihenfolge ?? a.reihenfolge ?? 99) - (b.gruppeReihenfolge ?? b.reihenfolge ?? 99));
+  }
+  return [...gruppen.values()];
+}
+
+/** Sheet einer Gruppe: welcher Bereich soll eingetragen werden? */
+export async function gruppeWaehlen(gruppeId, tag) {
+  const bereiche = (await alle(SPEICHER.config)).filter((b) => BEREICHE[b.id] && !b.ausgeblendet && !b.ohneEingabe && b.felder?.length && b.zeitart !== 'tag');
+  const [g] = gruppenVon(bereiche).filter((x) => x.id === gruppeId);
+  if (!g) return;
+  const eintraege = await eintraegeZwischen(`${tag}T00:00`, `${tag}T23:59`);
+  sheetOeffnen(g.titel, (koerper, schliessen) => {
+    koerper.innerHTML = `<div class="karte eintraege gruppe-wahl">${g.bereiche.map((b) => {
+      const n = eintraege.filter((e) => e.bereich === b.id).length;
+      return `<a class="eintrag-zeile" href="${neuAdresse(b.id, tag)}" style="--farbe: var(${BEREICHE[b.id].farbe})">
+          <span class="symbol-voll">${symbol(b.symbol ?? BEREICHE[b.id].symbol, 22)}</span>
+          <span class="eintrag-text"><span class="eintrag-titel"><strong>${esc(b.kurztitel ?? b.titel)}</strong></span>
+            <span class="eintrag-inhalt">${n ? (n === 1 ? '1 Eintrag an diesem Tag' : `${n} Einträge an diesem Tag`) : 'Neuer Eintrag'}</span></span>
+          ${symbol('weiter', 18)}
+        </a>`;
+    }).join('')}</div>`;
+    for (const a of koerper.querySelectorAll('a')) a.addEventListener('click', schliessen);
+  }, { untertitel: 'Was möchtest du eintragen?', farbe: BEREICHE[g.bereiche[0].id].farbe });
 }

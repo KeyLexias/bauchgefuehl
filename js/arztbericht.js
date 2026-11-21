@@ -108,7 +108,7 @@ function genesungText(k, z) {
   for (const b of k.genesung?.beschwerden ?? []) {
     const reihe = schmerz.get(b.id);
     const w = reihe ? kennzahl(z.von, z.bis, reihe.wertAm) : { anzahl: 0 };
-    const terminListe = termine(k.eintraege, b.id).filter((e) => e.zeitpunkt.slice(0, 10) >= z.von && e.zeitpunkt.slice(0, 10) <= z.bis).reverse();
+    const terminListe = termine(k.eintraege, b.id, k).filter((e) => e.zeitpunkt.slice(0, 10) >= z.von && e.zeitpunkt.slice(0, 10) <= z.bis).reverse();
     const uebungen = (b.uebungen ?? []).map((u) => ({ u, im: uebungsEintraege(k.eintraege, b.id, u.id).filter((e) => e.zeitpunkt.slice(0, 10) >= z.von && e.zeitpunkt.slice(0, 10) <= z.bis) }))
       .filter((x) => x.im.length);
     if (!w.anzahl && !terminListe.length && !uebungen.length) continue;
