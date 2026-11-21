@@ -1146,3 +1146,8 @@ div.kennzahl:active { transform: none; }
 .sheet .eingabe { padding-bottom: 0; }
 .sheet .wahl:not([aria-pressed="true"]), .sheet .eingabe-feld, .sheet .suche-eingabe { background: var(--fuellung); }
 .sheet .feld { margin-bottom: 4px; }
+
+/* Sheet: eigenes Scrollen ohne Durchreichen, größere Schließen-Fläche, Griff zum Ziehen */
+.sheet { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.sheet-griff { width: 44px; margin-bottom: 0; padding: 0; box-sizing: content-box; border-top: 8px solid transparent; border-bottom: 10px solid transparent; background-clip: padding-box; }
+.sheet .sheet-zu { width: 44px; height: 44px; margin: -2px -4px 0 0; }

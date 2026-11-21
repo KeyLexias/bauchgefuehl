@@ -157,9 +157,25 @@ export function uebungEingabe(ziel, optionen) {
   });
 }
 
+// Solange ein Sheet offen ist, scrollt die Seite dahinter nicht (Safari sperrt sie bei Dialogen nicht von selbst).
+let gesperrt = 0;
+let gespeichertY = 0;
+function hintergrundSperren() {
+  if (gesperrt++ > 0) return;
+  gespeichertY = window.scrollY;
+  Object.assign(document.body.style, { position: 'fixed', top: `-${gespeichertY}px`, left: '0', right: '0', width: '100%' });
+}
+function hintergrundFreigeben() {
+  if (--gesperrt > 0) return;
+  gesperrt = 0;
+  Object.assign(document.body.style, { position: '', top: '', left: '', right: '', width: '' });
+  window.scrollTo(0, gespeichertY);
+}
+
 /**
  * Öffnet ein Sheet von unten. `fuellen(koerper, schliessen)` zeichnet den Inhalt.
- * Tippen auf den abgedunkelten Rand oder Wischen nach unten (Escape) schließt es.
+ * Schließen: X, Tippen auf den abgedunkelten Bereich darüber, Wischen nach unten (am Griff, am Kopf oder wenn der
+ * Inhalt ganz oben ist) oder Escape.
  */
 export function sheetOeffnen(titel, fuellen, { untertitel = '', farbe = '--genesung' } = {}) {
   const dialog = document.createElement('dialog');
@@ -170,21 +186,65 @@ export function sheetOeffnen(titel, fuellen, { untertitel = '', farbe = '--genes
     <div class="sheet-griff" aria-hidden="true"></div>
     <header class="sheet-kopf">
       <div><h2>${esc(titel)}</h2>${untertitel ? `<p>${esc(untertitel)}</p>` : ''}</div>
-      <button type="button" class="rund-knopf klein" data-schliessen aria-label="Schließen">${symbol('schliessen', 18, 2.4)}</button>
+      <button type="button" class="rund-knopf klein sheet-zu" data-schliessen aria-label="Schließen">${symbol('schliessen', 18, 2.4)}</button>
     </header>
     <div class="sheet-inhalt"></div>`;
   document.body.append(dialog);
+  let zu = false;
   const schliessen = () => {
-    if (!dialog.open) return;
+    if (zu || !dialog.open) return;
+    zu = true;
+    dialog.style.animation = '';
+    dialog.style.transition = '';
     dialog.classList.add('zu');
-    const weg = () => { dialog.close(); dialog.remove(); };
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) weg();
-    else setTimeout(weg, 220);
+    const entfernen = () => { dialog.close(); dialog.remove(); hintergrundFreigeben(); };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) entfernen();
+    else setTimeout(entfernen, 220);
   };
-  dialog.addEventListener('click', (e) => { if (e.target === dialog) schliessen(); });
+  // Nur ein Tipp auf den abgedunkelten Bereich oberhalb des Sheets schließt, nicht auf seinen Rand.
+  dialog.addEventListener('click', (e) => {
+    if (e.target !== dialog) return;
+    const r = dialog.getBoundingClientRect();
+    if (e.clientY < r.top) schliessen();
+  });
   dialog.addEventListener('cancel', (e) => { e.preventDefault(); schliessen(); });
-  dialog.querySelector('[data-schliessen]').addEventListener('click', schliessen);
+  dialog.querySelector('[data-schliessen]').addEventListener('click', (e) => { e.stopPropagation(); schliessen(); });
+
+  // Wischen nach unten
+  let start = null;
+  let weg = 0;
+  dialog.addEventListener('touchstart', (e) => {
+    if (zu || e.touches.length !== 1 || e.target.closest('input, textarea, select, [data-schliessen]')) { start = null; return; }
+    const amKopf = !!e.target.closest('.sheet-griff, .sheet-kopf');
+    if (!amKopf && dialog.scrollTop > 0) { start = null; return; }
+    start = { y: e.touches[0].clientY, zeit: Date.now(), amKopf };
+    weg = 0;
+  }, { passive: true });
+  dialog.addEventListener('touchmove', (e) => {
+    if (!start) return;
+    const dy = e.touches[0].clientY - start.y;
+    // Nach oben oder bei gescrolltem Inhalt: normal scrollen lassen
+    if (dy <= 0 || (!start.amKopf && dialog.scrollTop > 0)) { if (weg === 0) start = null; return; }
+    e.preventDefault();
+    weg = dy;
+    dialog.style.animation = 'none';
+    dialog.style.transition = 'none';
+    dialog.style.transform = `translateY(${dy}px)`;
+  }, { passive: false });
+  const loslassen = () => {
+    if (!start) return;
+    const tempo = weg / Math.max(1, Date.now() - start.zeit);
+    start = null;
+    if (weg > 110 || (weg > 40 && tempo > 0.5)) { schliessen(); return; }
+    dialog.style.transition = 'transform 0.25s ease-out';
+    dialog.style.transform = '';
+    weg = 0;
+  };
+  dialog.addEventListener('touchend', loslassen);
+  dialog.addEventListener('touchcancel', loslassen);
+
   fuellen(dialog.querySelector('.sheet-inhalt'), schliessen);
+  hintergrundSperren();
   dialog.showModal();
   // Nicht gleich die Tastatur öffnen: den Fokus auf das Sheet selbst legen.
   dialog.querySelector('[data-schliessen]').blur();
